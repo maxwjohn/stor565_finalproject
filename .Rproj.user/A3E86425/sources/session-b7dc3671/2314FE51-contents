@@ -1,0 +1,71 @@
+---
+title: "PCA"
+author: "Nicolai"
+date: "2024-03-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+#Using Jebb's code for cleaning data
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+#setwd("/Users/nicolaibogh/Library/CloudStorage/OneDrive-KøbenhavnsUniversitet/Kandidat/UNC/STOR565 MACHINE LEARNING/StorGitHub/stor565MLproject")
+data <- read_csv("bigcitiesall.csv")
+total = data %>% filter(geo_label_citystate == "U.S. Total")
+```
+
+
+
+```{r}
+#Clean data code (data defined as latest_filtered)
+#Taking out na values and only using 2021
+cities <- read_csv("bigcities_wide.csv")
+us_total = cities %>% filter(geo_label_city == "U.S. Total")
+## Work with 2021 
+new_cities = cities %>% filter(date_label == 2021)
+na_count = colSums(is.na(new_cities)) / nrow(new_cities)
+lowna = na_count[colSums(is.na(new_cities)) / nrow(new_cities) < .33]
+lowna_cols = names(lowna)
+cities_nona = new_cities %>% select(all_of(lowna_cols))
+non_zero_sd_columns <- apply(cities, 2, sd) != 0
+
+#Jeb for you
+df <- cities_nona %>%
+  mutate(across(where(is.numeric), ~ifelse(is.na(.), median(., na.rm = TRUE), .)))
+df
+latest_filtered = df
+```
+
+
+# hierarchical clustering
+```{r, fig.width=8, fig.height=10}
+library(cluster)
+library(dendextend)
+
+# Only all numeric columns
+data_for_clustering <- select(latest_filtered, where(is.numeric))
+
+distance_matrix <- dist(data_for_clustering) # calculating distance matrix
+hierarchical_clusters <- hclust(distance_matrix)
+
+dend <- as.dendrogram(hierarchical_clusters) # Visualizing dendrogram with actual column names
+labels(dend) <- colnames(data_for_clustering) # Adding names as labels
+plot(dend, main = "Dendrogram for Hierarchical Clustering", horiz = TRUE)
+
+
+```
+
+
+
+
+
+
