@@ -55,13 +55,82 @@ df <- cities_nona %>%
 df
 latest_filtered = df
 ```
+```{r}
+# Find columns with non-constant variance
+non_constant_columns <- apply(latest_filtered[2:ncol(latest_filtered)], 2, function(x) var(x) != 0)
+
+# Keep only columns with non-constant variance
+latest_filtered_clean <- latest_filtered[, c(TRUE, non_constant_columns)]
+
+# Perform PCA on cleaned dataset
+pca_health <- prcomp(latest_filtered_clean[2:ncol(latest_filtered_clean)], scale = TRUE)
+# Print summary of PCA results
+summary(pca_health)
+```
+
+
+```{r}
+pca_health$rotation
+pca
+```
+
+
+```{r}
+# Extract PC scores
+PC1 <- pca_health$x[, 1]
+PC2 <- pca_health$x[, 2]
+
+# Plot PC1 vs PC2
+plot(PC1, PC2, xlab = "Principal Component 1", ylab = "Principal Component 2", main = "PC1 vs PC2")
+
+
+data.frame(cor(pca_health$x))
+```
+
+
+```{r}
+#Redefining latest data into latest_data_num
+set.seed(123)
+
+latest_data_num = latest_filtered_clean[2:ncol(latest_filtered_clean)]
+
+#preforming tsne
+
+library(Rtsne)
+
+# Assuming 'data' is your data matrix or data frame
+
+perplexity <- 10  # You can adjust this value as needed
+
+# Run t-SNE with specified parameters
+tsne_result <- Rtsne(latest_data_num, perplexity = perplexity)
+
+# Coordinates of the embedded data points
+embedded_data <- tsne_result$Y
+
+# Plot the embedded data points
+plot(embedded_data, col = 'blue', pch = 20)
+
+```
 
 
 
 ```{r}
-pca_health <- prcomp(bigcities_wide[, 2:length(bigcities_wide)], scale = TRUE) # here we scale the data so that "the variables should be scaled to have unit variance before the analysis takes place." 
+# Assuming 'latest_data_num' is your prepared data matrix or data frame
 
-pca_health
+# Perform k-means clustering with k clusters
+k <- 3  # Specify the number of clusters
+kmeans_result <- kmeans(latest_data_num, centers = k)
+
+# Extract cluster assignments
+cluster_assignments <- kmeans_result$cluster
+
+# Print cluster centers
+print(kmeans_result$centers)
+
+# Print cluster sizes
+table(cluster_assignments)
+
 
 ```
 
@@ -79,16 +148,3 @@ pca_health
 
 
 
-
-
-
-
-
-
-
-
-
-
-```{r}
-#Clustering hierarchical
-```
