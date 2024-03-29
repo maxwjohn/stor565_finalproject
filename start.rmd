@@ -1,0 +1,68 @@
+---
+title: "data transformation"
+author: "Max"
+date: "2024-03-06"
+output: html_document
+---
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+setwd("C:/Users/maxb1/OneDrive/Documents/UNC_Stuff/stor_565/final_project")
+data = bigcitiesall
+total = data %>% filter(geo_label_citystate == "U.S. Total")
+```
+
+### Pivoting to create the dataframe
+```{r, eval = FALSE}
+imp = data %>% select(metric_item_label, geo_label_city, geo_fips_code, value,date_label)
+wide = imp %>% pivot_wider( names_from = metric_item_label, values_from = value)
+## Write csv
+write.csv(wide, "bigcities_wide.csv", row.names = FALSE)
+```
+
+## Dropping High Na or no variance Columns
+```{r}
+data = bigcities_wide
+na_count = colSums(is.na(data)) / nrow(data)
+lowna = na_count[colSums(is.na(data)) / nrow(data) < .33]
+lowna_cols = names(lowna)
+data1 = data %>% select(all_of(lowna_cols))
+non_zero_sd_columns <- apply(data1, 2, sd) != 0
+
+# Subset the dataframe to keep only columns with non-zero standard deviation
+data_filtered <- data1 %>% select(names(non_zero_sd_columns))
+```
+
+Do we want to keep just 2020 and later data? for now, no
+```{r, eval=FALSE}
+data_2020 = data %>% filter(date_label != 2010)
+na_count_2020 = colSums(is.na(data_2020)) / nrow(data_2020)
+length(na_count_2020[colSums(is.na(data_2020)) / nrow(data_2020) < .33])
+lowna = na_count[colSums(is.na(data)) / nrow(data) < .33]
+lowna_cols = names(lowna)
+```
+This gives us 83 variables to work with across 240+ cities
+```{r}
+colnames(data1) # These are the variables
+## label columns are geo_label_city, geo_fips_code
+num_cols = data1 %>% select(!c(geo_label_city, geo_fips_code, date_label))
+par(mfrow=c(3,3), mar=c(4,4,2,0.5)) # Setup grid, margins
+for (j in 1:ncol(num_cols)) {
+  hist(num_cols[,j], xlab=colnames(num_cols)[j],
+       main=paste("Histogram of", colnames(num_cols)[j]),
+       col="lightblue", breaks=20)
+}
+```
+There are a lot of variables, most seem to be fairly normal, although there does seem to be some categories that have similar distributions. Deaths, drug related variables, transporation variables, all seem to be pretty similar within its own group.
+
+```{r}
+## 80 is too much to look at overall, but for some EDA going to look at first 10
+library(corrr)
+num_cols.cor = cor(num_cols[,1:5], use = "na.or.complete")
+num_cols.cor
+```
+We see a decent amount of correlation between even some of these variables, between variables such as death variables and uninsured variables. We also see negative correlation between some of the medical care variables and the death variables. This confirms our hypotheses that these variables will be interesting to look into further to try to create some sort of health index or predict the quality of a specific city.
+
