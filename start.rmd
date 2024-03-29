@@ -5,8 +5,6 @@ date: "2024-03-06"
 output: html_document
 ---
 
-
-Jeb for you
 df <- df %>%
   mutate(across(where(is.numeric), ~ifelse(is.na(.), median(., na.rm = TRUE), .)))
 ## Library Load
@@ -24,7 +22,7 @@ We are using the bigcities dataframe from {link}, this dataframe has a bunch of 
 ```{r}
 #setwd("C:/Users/maxb1/OneDrive/Documents/UNC_Stuff/stor_565/final_project")
 all_cities = read_csv("data/bigcitiesall.csv")
-total = data %>% filter(geo_label_citystate == "U.S. Total")
+total = all_cities %>% filter(geo_label_citystate == "U.S. Total")
 ```
 
 ### Pivoting to create the dataframe
@@ -45,10 +43,11 @@ na_count = colSums(is.na(new_cities)) / nrow(new_cities)
 lowna = na_count[colSums(is.na(new_cities)) / nrow(new_cities) < .33]
 lowna_cols = names(lowna)
 cities_nona = new_cities %>% select(all_of(lowna_cols))
-non_zero_sd_columns <- apply(cities, 2, sd) != 0
-
+## Impute as dataframe
+cities_clean <- cities_nona %>%
+  mutate(across(where(is.numeric), ~ifelse(is.na(.), median(., na.rm = TRUE), .)))
 # Subset the dataframe to keep only columns with non-zero standard deviation
-cities_filtered <- cities %>% select(names(non_zero_sd_columns))
+#cities_filtered <- cities_nona %>% select(names(non_zero_sd_columns))
 ```
 
 Do we want to keep just 2020 and later data? for now, no
@@ -59,41 +58,125 @@ length(na_count_2020[colSums(is.na(data_2020)) / nrow(data_2020) < .33])
 lowna = na_count[colSums(is.na(data)) / nrow(data) < .33]
 lowna_cols = names(lowna)
 ```
-This gives us 83 variables to work with across 240+ cities
+
+
+## Response Variable: 
+This section of our model will be attempting to predict the happiness of a city, from this source https://wallethub.com/edu/happiest-places-to-live/32619, using the data from our dataframe
+```{r}
+# Assuming the data is tab-separated
+happy <- read_csv("data/happiest_places_to_live.csv")
+happy <- happy %>% filter(!is.na(City))
+head(happy)
+## Edit names to make them equal
+happy <- happy %>%
+  mutate(City = ifelse(City == "Detroit, MI", "Detroit", City)) %>% 
+  mutate(City = ifelse(City == "Washington, DC", "Washington", City)) %>% 
+  mutate(City = ifelse(City == "New York", "New York City", City))
+```
+
+```{r}
+## Join 
+joined = cities_clean %>% left_join(happy, by = join_by(geo_label_city == City))
+response_cols = joined %>% select(any_of(colnames(happy)))
+colnames(response_cols)
+```
+
+Our goal is to see if we can predict happiness in the cities based on the variables we have. To begin, we will build some basic models. Our initial response variable will be Total Score.
+
+The first step is going to be choosing suitable variables. We begin with 
+his gives us 83 variables to work with across 36 cities and varying times
+
 ```{r}
 #colnames(data1) # These are the variables
 ## label columns are geo_label_city, geo_fips_code
 ## Numerical columns
-num_cols = cities_filtered %>% select(!c(geo_label_city, geo_fips_code, date_label))
-par(mfrow=c(3,3), mar=c(4,4,2,0.5)) # Setup grid, margins
-for (j in 1:ncol(num_cols)) {
-  hist(num_cols[,j], xlab=colnames(num_cols)[j],
-       main=paste("Histogram of", colnames(num_cols)[j]),
+num_cols = cities_clean %>% select(!c(geo_label_city, geo_fips_code, date_label))%>%
+  select(where(is.numeric))
+par(mfrow=c(3,3), mar=c(4,4,2,0.5))
+# Iterate over numeric columns and plot histograms
+for (j in seq_along(num_cols)) {
+  hist(num_cols[[j]], 
+       xlab=names(num_cols)[j],
+       main=paste("Histogram of", names(num_cols)[j]),
        col="lightblue", breaks=20)
 }
 ```
 There are a lot of variables, most seem to be fairly normal, although there does seem to be some categories that have similar distributions. Deaths, drug related variables, transporation variables, all seem to be pretty similar within its own group.
 
 ```{r}
+imp_vars = joined %>% select(`Total Score`, any_of(colnames(num_cols)))
 ## 80 is too much to look at overall, but for some EDA going to look at first 10
 library(corrr)
-num_cols.cor = cor(num_cols[,1:5], use = "na.or.complete")
-num_cols.cor
+cor_matrix = cor(imp_vars, use = "na.or.complete")
+cor_matrix[,1]
+cor_melted <- as.data.frame(as.table(cor_matrix))
+
+# Filter to remove self-correlations and get only one of each pair
+cor_melted_filtered <- subset(cor_melted, Var1 != Var2 & as.numeric(Var1) < as.numeric(Var2))
+
+# Filter for high correlations
+high_cor_pairs <- subset(cor_melted_filtered, abs(Freq) > 0.9)
+print(high_cor_pairs)
 ```
-We see a decent amount of correlation between even some of these variables, between variables such as death variables and uninsured variables. We also see negative correlation between some of the medical care variables and the death variables. This confirms our hypotheses that these variables will be interesting to look into further to try to create some sort of health index or predict the quality of a specific city.
+We see a very solid amount of correlation between a variety of our variables and our score. Clearly, predicting the model using many of these variables could create some very good results.
+We looked through these variables and are now going to be dropping one of the pairs that has high correlation.
 
 ```{r}
-d = prcomp(cities_filtered)
+dropping = c("Deaths from All Causes", "Poverty and Near Poverty in All Ages", "Poverty in Children", )
 ```
 
-## Response Variable: 
+There may be a decent level of collinearity, so I will be using VIF to reduce this.
+
 ```{r}
-# Read the lines of the text file
-lines <- readLines("text.txt")
-
-# Process the lines into a data frame
-# Assuming the data is tab-separated
-happy <- read_csv("happiest_places_to_live.csv")
-happy <- happy %>% filter(!is.na(City))
-head(happy)
+library(car)
+# Fit your linear model
+model <- lm(`Total Score` ~., data = imp_vars)
+alias(model)
 ```
+There is significant dependencies between the data. This means we will need to get creative when 
+
+
+We will start with a basic linear model and see how this predicts.
+## Subset Selection
+```{r}
+library(leaps)
+regfit.fwd=regsubsets(`Total Score`~.,data=imp_vars,nvmax=15,method="forward")
+summary(regfit.fwd)
+```
+
+```{r}
+set.seed(1)
+train=sample(c(TRUE,FALSE), nrow(imp_vars),rep=TRUE)
+test=(!train)
+sum(train)
+sum(test)
+```
+
+ Now let us use the training set to obtain best subset. 
+ 
+```{r}
+regfit.best=regsubsets(`Total Score`~.,data=imp_vars[train,],nvmax=19, method = "forward")
+```
+ 
+ We now compute the validation or test set error for model of each size. The first line transforms the test data into a format that is easily accesible for regression type models. 
+ 
+```{r}
+test.mat=model.matrix(Salary~.,data=Hitters[test,])
+val.errors=rep(NA,19)
+for(i in 1:19){
+   coefi=coef(regfit.best,id=i)
+   pred=test.mat[,names(coefi)]%*%coefi
+   val.errors[i]=mean((Hitters$Salary[test]-pred)^2)
+}
+val.errors
+x<- c(1:19)
+plot(x,val.errors, type="l")
+points(which.min(val.errors),val.errors[which.min(val.errors)], col="red",cex=2,pch=20)
+```
+ 
+ Thus the best model appears to be the one with **10** variables. 
+ 
+```{r}
+coef(regfit.best,10)
+```
+ 
