@@ -1,0 +1,31 @@
+---
+title: "Jeb_code_work"
+output: html_document
+date: "2024-03-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+V = EnVironment
+Weather
+Weather is a major environmental consideration. Earlier it was
+suggested pilots set their own personal minimums, especially
+when it comes to weather. As pilots evaluate the weather for
+a particular flight, they should consider the following:
+• What is the current ceiling and visibility? In
+mountainous terrain, consider having higher
+minimums for ceiling and visibility, particularly if
+the terrain is unfamiliar.
+• Consider the possibility that the weather may be
+different than forecast. Have alternative plans and
+be ready and willing to divert, should an unexpected
+change occur.
+• Consider the winds at the airports being used and the
+strength of the crosswind component.
+• If flying in mountainous terrain, consider whether
+there are strong winds aloft. Strong winds in
+mountainous terrain can cause severe turbul
