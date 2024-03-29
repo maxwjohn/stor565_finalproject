@@ -10,22 +10,85 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## R Markdown
 
-V = EnVironment
-Weather
-Weather is a major environmental consideration. Earlier it was
-suggested pilots set their own personal minimums, especially
-when it comes to weather. As pilots evaluate the weather for
-a particular flight, they should consider the following:
-• What is the current ceiling and visibility? In
-mountainous terrain, consider having higher
-minimums for ceiling and visibility, particularly if
-the terrain is unfamiliar.
-• Consider the possibility that the weather may be
-different than forecast. Have alternative plans and
-be ready and willing to divert, should an unexpected
-change occur.
-• Consider the winds at the airports being used and the
-strength of the crosswind component.
-• If flying in mountainous terrain, consider whether
-there are strong winds aloft. Strong winds in
-mountainous terrain can cause severe turbul
+
+
+
+
+
+
+
+
+
+
+#Using code for cleaning data
+
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+#setwd("C:/Users/maxb1/OneDrive/Documents/UNC_Stuff/stor_565/final_project")
+data = bigcitiesall
+total = data %>% filter(geo_label_citystate == "U.S. Total")
+```
+
+
+
+
+```{r}
+#Clean data code (data defined as latest_filtered)
+#Taking out na values and only using 2021
+cities = bigcities_wide
+us_total = cities %>% filter(geo_label_city == "U.S. Total")
+## Work with 2021 
+new_cities = cities %>% filter(date_label == 2021)
+na_count = colSums(is.na(new_cities)) / nrow(new_cities)
+lowna = na_count[colSums(is.na(new_cities)) / nrow(new_cities) < .33]
+lowna_cols = names(lowna)
+cities_nona = new_cities %>% select(all_of(lowna_cols))
+non_zero_sd_columns <- apply(cities, 2, sd) != 0
+
+#Jeb for you
+df <- cities_nona %>%
+  mutate(across(where(is.numeric), ~ifelse(is.na(.), median(., na.rm = TRUE), .)))
+df
+latest_filtered = df
+```
+
+
+
+```{r}
+pca_health <- prcomp(bigcities_wide[, 2:length(bigcities_wide)], scale = TRUE) # here we scale the data so that "the variables should be scaled to have unit variance before the analysis takes place." 
+
+pca_health
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#Clustering hierarchical
+```
