@@ -10,8 +10,9 @@ library(readr)
 library(dplyr)
 library(tidyr)
 library(tidyverse)
-setwd("C:/Users/maxb1/OneDrive/Documents/UNC_Stuff/stor_565/final_project")
-data = bigcitiesall
+library(readr)
+#setwd("C:/Users/maxb1/OneDrive/Documents/UNC_Stuff/stor_565/final_project")
+all_cities = read_csv("bigcitiesall.csv")
 total = data %>% filter(geo_label_citystate == "U.S. Total")
 ```
 
@@ -20,20 +21,20 @@ total = data %>% filter(geo_label_citystate == "U.S. Total")
 imp = data %>% select(metric_item_label, geo_label_city, geo_fips_code, value,date_label)
 wide = imp %>% pivot_wider( names_from = metric_item_label, values_from = value)
 ## Write csv
-write.csv(wide, "bigcities_wide.csv", row.names = FALSE)
+#write.csv(wide, "bigcities_wide.csv", row.names = FALSE)
 ```
 
 ## Dropping High Na or no variance Columns
 ```{r}
-data = bigcities_wide
-na_count = colSums(is.na(data)) / nrow(data)
-lowna = na_count[colSums(is.na(data)) / nrow(data) < .33]
+cities = read_csv("bigcities_wide.csv")
+na_count = colSums(is.na(cities)) / nrow(cities))
+lowna = na_count[colSums(is.na(cities)) / nrow(cities) < .33]
 lowna_cols = names(lowna)
-data1 = data %>% select(all_of(lowna_cols))
-non_zero_sd_columns <- apply(data1, 2, sd) != 0
+cities = cities %>% select(all_of(lowna_cols))
+non_zero_sd_columns <- apply(cities, 2, sd) != 0
 
 # Subset the dataframe to keep only columns with non-zero standard deviation
-data_filtered <- data1 %>% select(names(non_zero_sd_columns))
+cities_filtered <- cities %>% select(names(non_zero_sd_columns))
 ```
 
 Do we want to keep just 2020 and later data? for now, no
@@ -46,9 +47,10 @@ lowna_cols = names(lowna)
 ```
 This gives us 83 variables to work with across 240+ cities
 ```{r}
-colnames(data1) # These are the variables
+#colnames(data1) # These are the variables
 ## label columns are geo_label_city, geo_fips_code
-num_cols = data1 %>% select(!c(geo_label_city, geo_fips_code, date_label))
+## Numerical columns
+num_cols = cities_filtered %>% select(!c(geo_label_city, geo_fips_code, date_label))
 par(mfrow=c(3,3), mar=c(4,4,2,0.5)) # Setup grid, margins
 for (j in 1:ncol(num_cols)) {
   hist(num_cols[,j], xlab=colnames(num_cols)[j],
@@ -65,4 +67,8 @@ num_cols.cor = cor(num_cols[,1:5], use = "na.or.complete")
 num_cols.cor
 ```
 We see a decent amount of correlation between even some of these variables, between variables such as death variables and uninsured variables. We also see negative correlation between some of the medical care variables and the death variables. This confirms our hypotheses that these variables will be interesting to look into further to try to create some sort of health index or predict the quality of a specific city.
+
+```{r}
+d = prcomp(cities_filtered)
+```
 

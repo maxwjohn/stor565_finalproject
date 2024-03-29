@@ -1,0 +1,189 @@
+Overall Rank,City,State,Total Score,Emotional and Physical Well-being Rank,Income and Employment Rank,Community and Environment Rank
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+1,Fremont,California,74.16,1,85,3
+2,Overland Park,Kansas,69.78,6,36,6
+3,San Jose,California,69.54,2,33,37
+4,Madison,Wisconsin,68.99,7,17,9
+5,Irvine,California,68.22,4,26,24
+6,Honolulu,Hawaii,68.03,19,40,1
+7,San Francisco,California,67.01,3,81,30
+8,Pearl City,Hawaii,66.9,15,151,2
+9,Columbia,Maryland,65.77,5,170,60
+10,Scottsdale,Arizona,65.26,27,72,4
+11,Sioux Falls,South Dakota,65.06,10,57,47
+12,Huntington Beach,California,64.28,13,77,53
+13,Minneapolis,Minnesota,63.98,17,22,57
+14,Garden Grove,California,63.91,24,52,15
+15,San Diego,California,63.75,20,43,19
+16,Fargo,North Dakota,63.68,11,20,134
+17,Portland,Maine,63.46,43,3,27
+18,Seattle,Washington,63.39,8,14,128
+19,Lincoln,Nebraska,63.35,21,27,43
+20,Bismarck,North Dakota,63.23,12,11,149
+21,Gilbert,Arizona,62.99,40,44,7
+22,Charleston,South Carolina,62.53,45,15,18
+23,South Burlington,Vermont,62.42,16,30,139
+24,Glendale,California,62.31,32,92,13
+25,Anaheim,California,62.28,26,55,36
+26,Oakland,California,62.24,14,104,77
+27,Chula Vista,California,61.75,25,87,28
+28,Raleigh,North Carolina,61.73,9,126,99
+29,Santa Rosa,California,61.48,28,34,50
+30,Santa Clarita,California,61.4,23,122,49
+31,Boise,Idaho,61.35,34,5,76
+32,Oxnard,California,61.31,36,94,16
+33,Chandler,Arizona,60.9,50,84,17
+34,Oceanside,California,60.5,31,102,41
+35,Plano,Texas,60.47,35,93,39
+36,Rapid City,South Dakota,60.19,58,19,54
+37,Aurora,Illinois,60.04,29,149,33
+38,Anchorage,Alaska,59.89,62,78,14
+39,Yonkers,New York,59.88,22,147,87
+40,Chesapeake,Virginia,59.77,61,103,12
+41,Omaha,Nebraska,59.71,42,60,66
+42,Virginia Beach,Virginia,59.62,44,106,44
+43,Santa Ana,California,59.45,53,13,89
+44,St. Paul,Minnesota,59.4,37,110,59
+45,Cedar Rapids,Iowa,59.36,60,82,34
+46,Tempe,Arizona,59.34,64,32,32
+47,Peoria,Arizona,58.86,65,128,8
+48,Pembroke Pines,Florida,58.79,48,160,26
+49,Juneau,Alaska,58.73,45,56,112
+50,"Washington, DC",District of Columbia,58.69,18,117,144
+51,Cape Coral,Florida,58.54,70,101,11
+52,Fort Lauderdale,Florida,58.51,59,74,68
+53,Rancho Cucamonga,California,58.47,67,67,35
+54,Burlington,Vermont,58.35,54,4,165
+55,Jersey City,New Jersey,58.01,33,167,64
+56,Charlotte,North Carolina,57.9,30,134,102
+57,Durham,North Carolina,57.88,41,69,109
+58,Boston,Massachusetts,57.71,39,7,161
+59,Nampa,Idaho,57.62,72,16,86
+60,Aurora,Colorado,57.6,38,150,78
+61,Long Beach,California,57.59,51,109,92
+62,Tampa,Florida,57.49,69,46,63
+63,Sacramento,California,57.47,55,21,138
+64,Los Angeles,California,57.33,49,86,116
+65,Nashua,New Hampshire,57.26,75,68,38
+66,Austin,Texas,57.06,47,88,126
+67,Portland,Oregon,56.74,57,63,125
+68,Riverside,California,56.69,71,38,84
+69,Moreno Valley,California,56.65,81,99,23
+70,Missoula,Montana,56.44,85,37,46
+71,Mesa,Arizona,56.21,83,83,42
+72,Des Moines,Iowa,56.13,66,113,79
+73,Denver,Colorado,56.09,52,121,130
+74,Orlando,Florida,55.99,68,39,117
+75,Colorado Springs,Colorado,55.75,91,45,40
+76,Port St. Lucie,Florida,55.5,97,71,20
+77,Salt Lake City,Utah,55.45,77,31,123
+78,Fontana,California,55.45,95,73,21
+79,Pittsburgh,Pennsylvania,55.36,88,10,91
+80,St. Petersburg,Florida,55.34,78,53,90
+81,Ontario,California,55.24,96,62,31
+82,Billings,Montana,55.09,105,35,25
+83,Chicago,Illinois,54.8,56,179,83
+84,Miami,Florida,54.77,73,23,151
+85,Grand Rapids,Michigan,54.63,100,42,52
+86,New York,New York,54.49,63,174,73
+87,Phoenix,Arizona,54.14,86,115,69
+88,Manchester,New Hampshire,53.99,99,50,75
+89,Tacoma,Washington,53.96,80,123,103
+90,Wilmington,Delaware,53.71,126,124,5
+91,Modesto,California,53.6,103,66,65
+92,West Valley City,Utah,53.25,107,51,74
+93,Atlanta,Georgia,53.23,76,90,143
+94,Hialeah,Florida,52.91,79,132,119
+95,Columbia,South Carolina,52.89,122,28,48
+96,Cheyenne,Wyoming,52.63,87,24,164
+97,Worcester,Massachusetts,52.58,92,41,150
+98,Tallahassee,Florida,52.54,109,48,98
+99,Glendale,Arizona,52.44,93,133,81
+100,Vancouver,Washington,52.34,74,97,174
+101,Reno,Nevada,52.16,106,29,122
+102,Providence,Rhode Island,52.11,118,2,170
+103,Lexington-Fayette,Kentucky,52.01,110,120,70
+104,Irving,Texas ,51.93,98,111,108
+105,Bridgeport,Connecticut,51.84,82,180,72
+106,Jacksonville,Florida,51.76,115,135,51
+107,Nashville,Tennessee,51.72,119,118,58
+108,Milwaukee,Wisconsin,51.55,89,157,101
+109,Grand Prairie,Texas,51.25,112,154,55
+110,Garland,Texas,50.87,113,139,82
+111,Stockton,California,50.85,90,112,142
+112,Fresno,California,50.75,115,80,118
+113,Newport News,Virginia,50.5,102,153,114
+114,New Haven,Connecticut,50.47,128,49,110
+115,Henderson,Nevada,50.43,108,158,85
+116,Las Cruces,New Mexico,50.19,121,75,133
+117,Fort Worth,Texas,49.9,117,144,105
+118,Wichita,Kansas,49.86,124,108,94
+119,Warwick,Rhode Island,49.79,84,107,181
+120,Greensboro,North Carolina,49.25,101,96,162
+121,Arlington,Texas,49.23,111,143,135
+122,Fort Wayne,Indiana,49.12,127,137,93
+123,Bakersfield,California,48.92,131,129,96
+124,Spokane,Washington,48.88,134,8,145
+125,Winston-Salem,North Carolina,48.84,123,98,132
+126,Newark,New Jersey,48.82,104,175,120
+127,San Bernardino,California,48.43,138,79,97
+128,Kansas City,Missouri,48.39,125,131,129
+129,Albuquerque,New Mexico,48.32,132,69,141
+130,Dover,Delaware,48.3,157,127,10
+131,Norfolk,Virginia,48.25,129,125,127
+132,Dallas,Texas,48.07,114,138,158
+133,Lewiston,Maine,47.72,176,1,29
+134,Houston,Texas,47.4,94,168,172
+135,Columbus,Ohio,47.4,130,140,136
+136,Huntsville,Alabama,47.39,159,61,62
+137,Richmond,Virginia,47.27,120,159,157
+138,Chattanooga,Tennessee,47.14,150,116,45
+139,Tucson,Arizona,46.7,147,89,115
+140,Louisville,Kentucky,46.61,143,163,71
+141,Oklahoma City,Oklahoma,46.56,148,155,61
+142,El Paso,Texas,46.43,133,141,131
+143,Little Rock,Arkansas,46.4,142,152,100
+144,Indianapolis,Indiana,46.39,136,169,88
+145,Brownsville,Texas,46.38,154,59,113
+146,Cincinnati,Ohio,45.95,145,119,124
+147,Amarillo,Amarillo,45.86,153,91,111
+148,Rochester,New York,45.75,141,76,173
+149,Knoxville,Tennessee,45.71,169,25,56
+150,Laredo,Texas,45.52,160,6,153
+151,Buffalo,New York,45.47,140,105,160
+152,Las Vegas,Nevada,45.38,135,171,121
+153,Casper,Wyoming,45.21,144,100,168
+154,Springfield,Missouri,45.16,165,65,80
+155,North Las Vegas,Nevada,44.95,146,176,95
+156,New Orleans,Louisiana,44.87,152,58,154
+157,Tulsa,Oklahoma,44.86,162,95,104
+158,Corpus Christi,Texas,44.55,151,64,156
+159,Salem,Oregon,44.1,137,54,179
+160,Baltimore,Maryland,43.78,139,165,163
+161,Philadelphia,Pennsylvania,43.57,156,136,137
+162,Charleston,West Virginia,43.26,178,12,67
+163,Lubbock,Texas,43.17,164,47,155
+164,St. Louis,Missouri,42.99,149,166,147
+165,San Antonio,Texas,42.31,155,130,169
+166,Columbus,Georgia,40.91,168,142,148
+167,Fayetteville,North Carolina,40.56,170,146,152
+168,Fort Smith,Arkansas,40.1,181,9,106
+169,Baton Rouge,Louisiana,40.1,167,114,171
+170,Memphis,Tennessee,39.85,158,181,159
+171,Augusta,Georgia,39.44,163,156,178
+172,Gulfport,Mississippi,39.25,173,162,146
+173,Akron,Ohio,39.15,166,145,175
+174,Mobile,Alabama,38.97,175,172,107
+175,Jackson,Mississippi,38.79,161,178,177
+176,Toledo,Ohio,37.51,174,164,166
+177,Huntington,West Virginia,37.31,182,18,22
+178,Shreveport,Louisiana,36.54,179,173,140
+179,Birmingham,Alabama,36.22,171,148,180
+180,Montgomery,Alabama,35.7,177,177,167
+181,Cleveland,Ohio,34.83,172,161,182
+182,"Detroit, MI",Michigan,31.43,180,182,176
