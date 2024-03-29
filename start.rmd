@@ -5,14 +5,25 @@ date: "2024-03-06"
 output: html_document
 ---
 
+
+Jeb for you
+df <- df %>%
+  mutate(across(where(is.numeric), ~ifelse(is.na(.), median(., na.rm = TRUE), .)))
+## Library Load
 ```{r}
 library(readr)
 library(dplyr)
 library(tidyr)
 library(tidyverse)
 library(readr)
+```
+
+## Initial Dataframe
+
+We are using the bigcities dataframe from {link}, this dataframe has a bunch of metrics for each city per each 
+```{r}
 #setwd("C:/Users/maxb1/OneDrive/Documents/UNC_Stuff/stor_565/final_project")
-all_cities = read_csv("bigcitiesall.csv")
+all_cities = read_csv("data/bigcitiesall.csv")
 total = data %>% filter(geo_label_citystate == "U.S. Total")
 ```
 
@@ -26,11 +37,14 @@ wide = imp %>% pivot_wider( names_from = metric_item_label, values_from = value)
 
 ## Dropping High Na or no variance Columns
 ```{r}
-cities = read_csv("bigcities_wide.csv")
-na_count = colSums(is.na(cities)) / nrow(cities))
-lowna = na_count[colSums(is.na(cities)) / nrow(cities) < .33]
+cities = read_csv("data/bigcities_wide.csv")
+us_total = cities %>% filter(geo_label_city == "U.S. Total")
+## Work with 2021 or 2020 data
+new_cities = cities %>% filter(date_label == 2021)
+na_count = colSums(is.na(new_cities)) / nrow(new_cities)
+lowna = na_count[colSums(is.na(new_cities)) / nrow(new_cities) < .33]
 lowna_cols = names(lowna)
-cities = cities %>% select(all_of(lowna_cols))
+cities_nona = new_cities %>% select(all_of(lowna_cols))
 non_zero_sd_columns <- apply(cities, 2, sd) != 0
 
 # Subset the dataframe to keep only columns with non-zero standard deviation
@@ -72,3 +86,14 @@ We see a decent amount of correlation between even some of these variables, betw
 d = prcomp(cities_filtered)
 ```
 
+## Response Variable: 
+```{r}
+# Read the lines of the text file
+lines <- readLines("text.txt")
+
+# Process the lines into a data frame
+# Assuming the data is tab-separated
+happy <- read_csv("happiest_places_to_live.csv")
+happy <- happy %>% filter(!is.na(City))
+head(happy)
+```
