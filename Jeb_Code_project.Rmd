@@ -131,6 +131,7 @@ print(kmeans_result$centers)
 # Print cluster sizes
 table(cluster_assignments)
 
+ 
 
 ```
 
