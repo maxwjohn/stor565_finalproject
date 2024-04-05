@@ -65,7 +65,57 @@ plot(dend, main = "Dendrogram for Hierarchical Clustering", horiz = TRUE)
 ```
 
 
+I want to plot a graph of the within-cluster sum of squares (WSS) or variance against the number of clusters. The "elbow" point in the plot should represents the optimal number of clusters where adding more clusters does not significantly decrease the WSS. This method is more commonly used for k-means clustering but should also provide insights for hierarchical clustering.
 
+To create a graph of the WSS or variance against the number of clusters (Elbow Method) for hierarchical clustering, we need to perform hierarchical clustering for different numbers of clusters and calculate the WSS or variance for each. However, hierarchical clustering does not directly provide WSS or variance values.
+
+Instead, we can use the increase in the agglomeration coefficients between each step of the hierarchical clustering as a measure of "inertia" or "variance." The agglomeration coefficient represents the increase in distance between clusters as they are merged. A larger increase indicates that the clusters being merged are more different from each other, which can be interpreted as higher within-cluster variance.
+
+    - I loop through different numbers of clusters from 2 to 10.
+    - For each number of clusters, I perform hierarchical clustering using the hclust() function and calculate the WSS using the agglomeration coefficients.
+    - I then plot the number of clusters against the WSS to visualize the Elbow Method graph.
+
+```{r}
+#################### Elbow Method  ####################
+# Perform HC for different numbers of clusters
+wss <- c()
+for (i in 2:10) {
+  hierarchical_clusters <- hclust(distance_matrix, method = "average")
+  wss[i - 1] <- sum((hierarchical_clusters$height)^2)
+}
+# from ?hclust: the agglomeration method to be used. This should be (an unambiguous abbreviation of) one of "ward.D", "ward.D2", "single", "complete", "average" (= UPGMA), "mcquitty" (= WPGMA), "median" (= WPGMC) or "centroid" (= UPGMC).
+
+# Plotting the Elbow Method graph
+plot(2:10, wss, type = "b", pch = 19, frame = FALSE, 
+     xlab = "Number of Clusters", ylab = "Within-cluster Sum of Squares",
+     main = "Elbow Method for Hierarchical Clustering")
+
+
+```
+
+Unfortunately, the plot for the Elbow Method graph appears as a horizontal line rather than having a clear "elbow" shape. This could suggest that there might not be a distinct optimal number of clusters based on the WSS or variance.
+
+I have checked different hierarchical clustering methods (e.g., single linkage, complete linkage, average linkage, Ward's method) but they do not produce different results. The choice of method could affect the shape of the Elbow Method graph but doesn't in this case.
+
+One reason why the plot for the Elbow Method graph appears as a horizontal line rather than having a clear "elbow" shape could be because of the dimensionality of the data. Since we have a high-dimensional dataset for the clustering (36 obs. of 94 variables), the Elbow Method may not be as effective, as the concept of "elbow" becomes less clear in higher-dimensional spaces.
+Other factors could be the presence of noise or outliers in the data, which can also affect the clustering results and make it difficult to identify a clear elbow.
+
+```{r}
+# Calculating the hierarchical clustering
+distance_matrix <- dist(data_for_clustering)
+hierarchical_clusters <- hclust(distance_matrix)
+
+# Cutting the dendrogram to get clusters
+num_clusters <- 3  # Adjust this based on your dendrogram
+clusters <- cutree(hierarchical_clusters, k = num_clusters)
+
+# Calculating silhouette score
+silhouette_score <- silhouette(clusters, dist = as.dist(distance_matrix))
+print(silhouette_score)
+
+# Plotting silhouette width
+plot(silhouette_score, main = "Silhouette Plot for Hierarchical Clustering")
+```
 
 
 
