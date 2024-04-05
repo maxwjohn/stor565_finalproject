@@ -115,68 +115,36 @@ cor_melted <- as.data.frame(as.table(cor_matrix))
 cor_melted_filtered <- subset(cor_melted, Var1 != Var2 & as.numeric(Var1) < as.numeric(Var2))
 
 # Filter for high correlations
-high_cor_pairs <- subset(cor_melted_filtered, abs(Freq) > 0.9)
+high_cor_pairs <- subset(cor_melted_filtered, abs(Freq) > 0.75)
 print(high_cor_pairs)
 ```
-We see a very solid amount of correlation between a variety of our variables and our score. Clearly, predicting the model using many of these variables could create some very good results.
-We looked through these variables and are now going to be dropping one of the pairs that has high correlation.
+There are 400 pairs of very high correlation (>.75). Sources of this are:
+  - Death Variables
+  - Children related variables
+  - Transportation Variables
+  - Single Parent Families
+  - Income Inequality related variables
+  - Poverty related variables
 
-```{r}
-dropping = c("Deaths from All Causes", "Poverty and Near Poverty in All Ages", "Poverty in Children", )
-```
+Specific variables that have a lot of high correlation are:
+  - Preterm Births
+  - Premature Death
+  - Life Expectancy
+  - Single-Parent Families
+  - Household Income Inequality
+  - Service Workers
+  
 
-There may be a decent level of collinearity, so I will be using VIF to reduce this.
+With this level of correlation, using this to classify something, even like total score will not yield much meaninful results. However, we will try to classify cities into categories/groupings, and attempt to explain the variation when it does vary from each other, and apply these groupings in other situations.
 
-```{r}
-library(car)
-# Fit your linear model
-model <- lm(`Total Score` ~., data = imp_vars)
-alias(model)
-```
-There is significant dependencies between the data. This means we will need to get creative when 
+Things we could potentially predict:
 
-
-We will start with a basic linear model and see how this predicts.
-## Subset Selection
-```{r}
-library(leaps)
-regfit.fwd=regsubsets(`Total Score`~.,data=imp_vars,nvmax=15,method="forward")
-summary(regfit.fwd)
-```
-
-```{r}
-set.seed(1)
-train=sample(c(TRUE,FALSE), nrow(imp_vars),rep=TRUE)
-test=(!train)
-sum(train)
-sum(test)
-```
-
- Now let us use the training set to obtain best subset. 
- 
-```{r}
-regfit.best=regsubsets(`Total Score`~.,data=imp_vars[train,],nvmax=19, method = "forward")
-```
- 
- We now compute the validation or test set error for model of each size. The first line transforms the test data into a format that is easily accesible for regression type models. 
- 
-```{r}
-test.mat=model.matrix(Salary~.,data=Hitters[test,])
-val.errors=rep(NA,19)
-for(i in 1:19){
-   coefi=coef(regfit.best,id=i)
-   pred=test.mat[,names(coefi)]%*%coefi
-   val.errors[i]=mean((Hitters$Salary[test]-pred)^2)
-}
-val.errors
-x<- c(1:19)
-plot(x,val.errors, type="l")
-points(which.min(val.errors),val.errors[which.min(val.errors)], col="red",cex=2,pch=20)
-```
- 
- Thus the best model appears to be the one with **10** variables. 
- 
-```{r}
-coef(regfit.best,10)
-```
- 
+- Consumer Price Index: https://fred.stlouisfed.org/series/CPIAUCSL
+- Home Price Index: https://fred.stlouisfed.org/series/SPCS20RSA
+- Meidcal Cost: https://fred.stlouisfed.org/series/CPIMEDSL
+- Walkability: https://catalog.data.gov/dataset/walkability-index1
+- Public School data: https://catalog.data.gov/dataset/public-school-characteristics-current-8d621
+- College Scorecards: https://catalog.data.gov/dataset/college-scorecard-c25e9
+- redlining: https://catalog.data.gov/dataset/redlining-maps-from-the-home-owners-loan-corporation-1937
+- Zip code: https://catalog.data.gov/dataset/places-local-data-for-better-health-zcta-data-2020-release-ea5f2
+- Places data: https://catalog.data.gov/dataset/places-local-data-for-better-health-county-data-2020-release-94305
