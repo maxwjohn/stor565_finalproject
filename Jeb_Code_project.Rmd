@@ -136,11 +136,102 @@ table(cluster_assignments)
 ```
 
 
+```{r}
+
+# Assuming 'latest_data_num' is your prepared data matrix or data frame
+
+# Perform k-means clustering with k clusters
+k <- 4  # Specify the number of clusters
+kmeans_result <- kmeans(latest_data_num, centers = k)
+
+# Extract cluster assignments
+cluster_assignments <- kmeans_result$cluster
+
+# Print cluster centers
+print(kmeans_result$centers)
+
+# Print cluster sizes
+table(cluster_assignments)
+
+ 
+
+```
+
+#K-means on PCA and original Data needed
+
+#Kmeans function on the Original Data (k=2:17)
+```{r}
+performKMeansRange <- function(data_frame, k_range, distance_method = "euclidean") {
+  # Ensure data frame doesn't contain NA, NaN, or Inf values
+  # Remove rows containing any such values
+  clean_data_frame <- na.omit(data_frame) # More efficient way to remove rows with NA, NaN or Inf
+  
+  # Initialize an empty data frame to store results
+  results_df <- data.frame(k = integer(), cluster = integer(), size = integer(), 
+                           withinss = numeric(), tot.withinss = numeric(), betweenss = numeric(), 
+                           totss = numeric(), stringsAsFactors = FALSE)
+
+  # Iterate over the range of k values
+  for (k in k_range) {
+    # Perform k-means clustering with the current k
+    set.seed(123) # Ensure reproducibility
+    kmeans_result <- kmeans(clean_data_frame, centers = k, iter.max = 1000, nstart = 25)
+    
+    # Calculate between-cluster sum of squares
+    betweenss <- kmeans_result$totss - kmeans_result$tot.withinss
+    
+    # Construct a temporary data frame to hold cluster sizes and statistics for this k
+    cluster_sizes <- table(kmeans_result$cluster)
+    temp_df <- data.frame(k = rep(k, length(cluster_sizes)), 
+                          cluster = 1:length(cluster_sizes), 
+                          size = as.vector(cluster_sizes), 
+                          withinss = kmeans_result$withinss, 
+                          tot.withinss = rep(kmeans_result$tot.withinss, length(cluster_sizes)),
+                          betweenss = rep(betweenss, length(cluster_sizes)),
+                          totss = rep(kmeans_result$totss, length(cluster_sizes)), 
+                          stringsAsFactors = FALSE)
+    
+    # Combine the temporary data frame with the overall results data frame
+    results_df <- rbind(results_df, temp_df)
+  }
+  
+  return(results_df)
+}
+
+k_range = 2:17
+
+results_df <- performKMeansRange(latest_data_num, k_range)
+
+# View the results
+print(results_df)
+
+```
+
+
+#Now lets preform k_means on the scaled data to avoid distribution related errors
+```{r}
+
+performKMeansRange(scale(latest_data_num), k_range)
+
+
+```
 
 
 
 
 
+
+
+#K_means on PCA components
+
+```{r}
+
+#Note pca_health is 
+k_range = 2:17
+performKMeansRange(pca_health$x, k_range)
+
+
+```
 
 
 
