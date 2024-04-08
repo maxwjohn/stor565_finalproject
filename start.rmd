@@ -33,7 +33,7 @@ wide = imp %>% pivot_wider( names_from = metric_item_label, values_from = value)
 #write.csv(wide, "bigcities_wide.csv", row.names = FALSE)
 ```
 
-## Dropping High Na or no variance Columns
+### Dropping High Na or no variance Columns
 ```{r}
 cities = read_csv("data/bigcities_wide.csv")
 us_total = cities %>% filter(geo_label_city == "U.S. Total")
@@ -45,9 +45,11 @@ lowna_cols = names(lowna)
 cities_nona = new_cities %>% select(all_of(lowna_cols))
 ## Impute as dataframe
 cities_clean <- cities_nona %>%
-  mutate(across(where(is.numeric), ~ifelse(is.na(.), median(., na.rm = TRUE), .)))
+  mutate(across(where(is.numeric), ~ifelse(is.na(.), median(., na.rm = TRUE), .))) %>% 
+  filter(geo_label_city != "U.S. Total")
 # Subset the dataframe to keep only columns with non-zero standard deviation
 #cities_filtered <- cities_nona %>% select(names(non_zero_sd_columns))
+
 ```
 
 Do we want to keep just 2020 and later data? for now, no
@@ -59,39 +61,19 @@ lowna = na_count[colSums(is.na(data)) / nrow(data) < .33]
 lowna_cols = names(lowna)
 ```
 
+## Exploratory Data Analysis
 
-## Response Variable: 
-This section of our model will be attempting to predict the happiness of a city, from this source https://wallethub.com/edu/happiest-places-to-live/32619, using the data from our dataframe
-```{r}
-# Assuming the data is tab-separated
-happy <- read_csv("data/happiest_places_to_live.csv")
-happy <- happy %>% filter(!is.na(City))
-head(happy)
-## Edit names to make them equal
-happy <- happy %>%
-  mutate(City = ifelse(City == "Detroit, MI", "Detroit", City)) %>% 
-  mutate(City = ifelse(City == "Washington, DC", "Washington", City)) %>% 
-  mutate(City = ifelse(City == "New York", "New York City", City))
-```
+Our goal is to see what we can predict given the quality of a city. To start, we will build a model attempting to give a "rating" of a city, comparing this to another source's list on what are the best cities. 
+
+The first step is going to be choosing suitable variables.
+
+The initial data analysis gave us about 
 
 ```{r}
-## Join 
-joined = cities_clean %>% left_join(happy, by = join_by(geo_label_city == City))
-response_cols = joined %>% select(any_of(colnames(happy)))
-colnames(response_cols)
-```
-
-Our goal is to see if we can predict happiness in the cities based on the variables we have. To begin, we will build some basic models. Our initial response variable will be Total Score.
-
-The first step is going to be choosing suitable variables. We begin with 
-his gives us 83 variables to work with across 36 cities and varying times
-
-```{r}
-#colnames(data1) # These are the variables
+#colnames(num_cols) # These are the variables
 ## label columns are geo_label_city, geo_fips_code
 ## Numerical columns
-num_cols = cities_clean %>% select(!c(geo_label_city, geo_fips_code, date_label))%>%
-  select(where(is.numeric))
+num_cols = cities_clean %>% select(!c(geo_label_city, geo_fips_code, date_label))## 88 columns
 par(mfrow=c(3,3), mar=c(4,4,2,0.5))
 # Iterate over numeric columns and plot histograms
 for (j in seq_along(num_cols)) {
@@ -101,13 +83,63 @@ for (j in seq_along(num_cols)) {
        col="lightblue", breaks=20)
 }
 ```
+
+The initial histogram shows a decent amount of variation in the variables. Because we have high dimension (p) and low sample size, this can lead to a lot of problems with dimensionality. To fix this, we are going to try to reduce multicollinearity by using correlation and domain understanding.
+
+Before this, we are going to do some initial clustering to see if there are any groupings that we could potentially use to reduce dimensions.
+
+## base df on cities
+```{r}
+scaled = scale(cities_clean %>% select(!c(geo_label_city, geo_fips_code, date_label)))
+hc = hclust(dist(scaled))
+#hc = cutree(a, k = 5)
+cluster_assignments <- cutree(hc, k = 4)
+
+# Create a dataframe with cluster assignments
+df_clusters <- data.frame(cities_clean, Cluster = as.factor(cluster_assignments))
+```
+
+```{r}
+plot(hc, labels = FALSE) # Set labels=FALSE to avoid cluttering
+rect.hclust(hc, k = 4, border = "red") # Add rectangles to delineate the 4 clusters
+
+rownames(cities_clean) = substr(cities_clean$geo_label_city, 1, 5)
+# Add text labels
+# Compute appropriate y positions for text labels (may need adjustment)
+y_positions <- rep(min(hc$height), length(cluster_assignments))
+text(x = 1:length(cluster_assignments), y = y_positions, labels = row.names(cities_clean), cex = 0.6, pos = 3)
+```
+## Hierarchical clustering on columns
+```{r}
+df_t <- t(scaled)
+
+# Calculate the distance matrix using Euclidean distance (you can choose another method)
+dist_matrix <- dist(df_t, method = "euclidean")
+
+# Perform hierarchical clustering
+hc_columns <- hclust(dist_matrix, method = "complete") # You can choose another linkage method
+
+# Plot the dendrogram
+plot(hc_columns, main = "Dendrogram of Columns", xlab = "Columns", sub = "", ylab = "Height")
+
+varclusters <- cutree(hc_columns, k = 10)
+
+# If you want to see which columns are in each cluster
+
+df_varclusters <- data.frame(df_t, Cluster = as.factor(varclusters)) %>% select(Cluster)
+```
+```{r}
+
+```
+
+
 There are a lot of variables, most seem to be fairly normal, although there does seem to be some categories that have similar distributions. Deaths, drug related variables, transporation variables, all seem to be pretty similar within its own group.
 
 ```{r}
-imp_vars = joined %>% select(`Total Score`, any_of(colnames(num_cols)))
 ## 80 is too much to look at overall, but for some EDA going to look at first 10
+cor(num_cols[,1:10]) # Very high correlation, need to see further how bad this problem is
 library(corrr)
-cor_matrix = cor(imp_vars, use = "na.or.complete")
+cor_matrix = cor(num_cols, use = "na.or.complete")
 cor_matrix[,1]
 cor_melted <- as.data.frame(as.table(cor_matrix))
 
@@ -135,7 +167,236 @@ Specific variables that have a lot of high correlation are:
   - Service Workers
   
 
-With this level of correlation, using this to classify something, even like total score will not yield much meaninful results. However, we will try to classify cities into categories/groupings, and attempt to explain the variation when it does vary from each other, and apply these groupings in other situations.
+With this level of correlation, using this to classify something, even like total score will not yield much meaningful results. However, we will try to classify cities into categories/groupings, and attempt to explain the variation when it does vary from each other, and apply these groupings in other situations.
+
+In this part we will attempt to reduce our 86 variables to between 10-20 variables, and then try hierarchical clustering on these variables to attempt to get groupings. We will do this through a mix of checking correlations and domain understanding. THis will not be super mathematically driven, as we can look from the original histograms and these correlation matrices that there is no major difference between most of these variables, so we will pick variables that we think will give us the greatest amount of interpretability while still being able to keep some level of predictive power.
+
+```{r}
+colnames(cities_clean %>% select(!c("geo_label_city", "geo_fips_code", "date_label")))
+```
+A solid percentage of variables have to do with death/life expectancy. We are going to try to reduce these into a few variables, as many of these have very high correlations as well. These are a list of a bunch of variables that are all related to life expectancies and death.
+
+```{r}
+health_vars = c("COVID-19 Deaths","Deaths from All Causes", "Life Expectancy", "All Cancer Deaths", "Breast Cancer Deaths", "Lung Cancer Deaths", "Cardiovascular Disease Deaths", "Heart Disease Deaths", "High Blood Pressure",  "Diabetes", "Adult Obesity", "Adult Physical Inactivity", "Pneumonia or Influenza Deaths", "HIV-Related Deaths", "HIV/AIDS Prevalence", "New Chlamydia Cases", "Syphilis Prevalence", "Syphilis, Newborns", "New Gonorrhea Cases", "Maternal Deaths", "Infant Deaths", "Low Birthweight","Teen Births", "Opioid Overdose Deaths", "Adult Binge Drinking", "Drug Overdose Deaths", "Adult Smoking", "Injury Deaths", "Gun Deaths (Firearms)","Motor Vehicle Deaths",  "Police Killings", "Violent Crime", "Homicides", "Seniors", "Colorectal Cancer Deaths", "Prostate Cancer Deaths",         "Preterm Births","Premature Death"  )
+```
+
+```{r}
+death_cor = corrr::correlate(cities_clean %>% select(contains("death")))
+death_cor
+```
+*Premature Deaths* is a variable that can capture the pattern we are looking for, which is various stats that show taht people are unhealthier or dying earlier. This may allow us to reduce the features that we look through. Looking at the correlations for premature deaths, we can see very high correlation between the cancer variables and a bunch of other of the death variables. We are choosing to keep this, and will see what other death variables we will keep.
+
+```{r}
+prem_cor = death_cor[21]
+hi_var_prem = death_cor$term[(prem_cor %>% pull("Premature Death")) > .75]
+drop_vars = c()
+drop_vars = append(drop_vars,hi_var_prem) # Drop NA values
+## Checking other correlations with premature deaths
+death_cor2 = corrr::correlate(cities_clean %>% select(c("Premature Death",  "Life Expectancy","High Blood Pressure",  "Diabetes", "Adult Obesity", "Adult Physical Inactivity", "HIV-Related Deaths", "HIV/AIDS Prevalence", "New Chlamydia Cases", "Syphilis Prevalence", "Syphilis, Newborns", "New Gonorrhea Cases", "Low Birthweight","Teen Births", "Adult Binge Drinking", "Adult Smoking", "Police Killings", "Violent Crime", "Homicides", "Seniors", "Preterm Births")))
+prem_cor2 = death_cor2[2]
+hi_var_prem2 = death_cor2$term[abs(prem_cor2 %>% pull("Premature Death")) > .75]
+drop_vars = append(drop_vars, hi_var_prem2)
+drop_vars = drop_vars[!sapply(drop_vars, is.na)]
+leftover = health_vars %>% setdiff(drop_vars)
+## Checking correlation of leftover variables
+corrr::correlate(cities_clean %>% select(all_of(leftover)))
+## Other High Correlations: STD variables, Drug overdose
+## Solving STD correlation problems: Combining into one variable
+std_vars = c("HIV-Related Deaths", "HIV/AIDS Prevalence","New Chlamydia Cases", "Syphilis Prevalence", "Syphilis, Newborns","New Gonorrhea Cases")
+std_df <- cities_clean %>%
+  mutate(across(all_of(std_vars), 
+                ~(. - mean(., na.rm = TRUE)) / sd(., na.rm = TRUE), 
+                .names = "{.col}_standardized")) %>% 
+  rowwise() %>%
+  mutate(average_std = mean(c_across(ends_with("_standardized")), na.rm = TRUE)) %>%
+  ungroup()
+new_df = cities_clean
+new_df$average_std = std_df$average_std
+drop_vars = append(drop_vars, std_vars)
+```
+With some of the variables, there was obvious choices to be made, such as there was a .98 correlation between *Drug Overdose Deaths* and *Opioid Overdose Deaths*. We chose the drug variable as it was a little broader. However, with the std variables, there was no obvious variable that would be able to reflect the rest, so we combined them together into one variable that was an average of all of them. 
+
+At this moment, *Premature Deaths* remains our choice of how to reflect the health/death related variales, as it is a good reflection based on an understanding of premature deaths as a concept. If a lot of people are dying earlier than expected it is likely an area with poor health, and potentially also dangerous. Although we may be losing a level of predictive power, it is necessary for us to be able to reduce the dimensionality of our problem.
+
+
+Next, we will look at smaller relationships, starting with Homelessness, Transportation and segregation
+
+```{r}
+correlate(new_df %>% select(contains("Homelessness"))) # these can be kept the way they are
+correlate(new_df %>% select(contains("Segregation"))) # Will focus primarily on White and Non-White, others wont be quite as important
+correlate(new_df %>% select(contains("Poverty"))) ## Going to keep Poverty in all Ages
+drop_vars = append(drop_vars, c("Opioid Overdose Deaths", "Racial Segregation, White and Black", "Racial Segregation, White and Asian", "Racial Segregation, White and Hispanic", "Poverty and Near Poverty in All Ages", "Poverty in Children"))
+new_df = new_df %>% select(!any_of(drop_vars))
+```
+
+In this code chunk, we dropped the other segregation variables and are focusing on white and non-white, and kept the broader of the poverty variables: *Poverty in All Ages*.
+
+We will be testing how many high correlation pairs we have left to see how many more variables we need to drop.
+
+## Checking how much correlation we have left
+```{r}
+cor_matrix = cor(new_df %>% select(!c("geo_label_city", "geo_fips_code", "date_label")), use = "na.or.complete")
+cor_matrix[,1]
+cor_melted <- as.data.frame(as.table(cor_matrix))
+
+# Filter to remove self-correlations and get only one of each pair
+cor_melted_filtered <- subset(cor_melted, Var1 != Var2 & as.numeric(Var1) < as.numeric(Var2))
+
+# Filter for high correlations
+high_cor_pairs <- subset(cor_melted_filtered, abs(Freq) > 0.75)
+print(high_cor_pairs)
+high_cor_pairs %>% group_by(Var1) %>% count() %>% arrange(desc(n))
+high_cor_pairs %>% group_by(Var2) %>% count() %>% arrange(desc(n))
+```
+Variables with high correlations with other variables are as we printed out. We wish to capture some factor about economy, some factor of health, some factor about housing, something with education, and something with transportation. 
+
+From here we are going to drop variables that have high correlations and do not seem to be helpful. To begin, *Lack of Car* has high correlations with 2 variables, and lack of car seems like it could be explained easily by other variables such as income and city, and this can be covered by the walking to work variable. The *Service Workers* variable is another variable that has high correlations, and this variation could be covered by other variables such as income, and does not seem to be too important to predict city type. The income related variables all seem to have a lot of correlated relationships. *Household Income Inequality* is highly correlated with many other variables, and so we will drop all the variables that it has high correlation with to see if we can explan the variation related with other employment and income related variables.
+
+*Population Density* is a variable that is highly correlated with many variables, and when it comes to quality of a city, density is not the only factor, and the related factors could be more powerful and capture this variation such as transportation and supermarket access among others.
+
+Smaller Pairs that have high variation: 
+- Uninsured, All Ages	vs. Uninsured, Child (keep *Uninsured, All Ages	*)
+- Owner Occupied Housing vs. 	Renters vs. Owners (keep *Owner Occupied Housing*)
+- Income Variables: keeping *Per-capita Household Income*
+- *Drives Alone to Work*: Other important variables similar to this
+
+```{r}
+## Employee/Income variables
+emp_inc_vars = c("Poverty in All Ages", "Per-capita Household Income", "Households with Higher-Incomes", "Service Workers", "Unemployment")
+## Transportation Variables
+transp_vars = c("Drives Alone to Work", "Population Density", "Riding Bike to Work", "Longer Driving Commute Time", "Walking to Work", "Lack of Car", "Public Transportation Use")
+correlate(new_df %>% select(any_of(emp_inc_vars)))
+correlate(new_df %>% select(any_of(transp_vars)))
+more_vars = setdiff(emp_inc_vars, "Poverty in All Ages") %>%
+  union(
+  setdiff(transp_vars, "Public Transportation Use")
+)
+new_df = new_df %>% select(!any_of(more_vars)) %>% select(!`Uninsured, Child`)
+```
+Looking through transportation related variables and employment/income variables, we are going to keep *Public Transportation Use* and *Poverty in all Ages*, because these were both highly correlated with the other variables within their category, and are very explainable for reasons, as poverty and public transportation seem to be very important for a city and its quality of living.
+
+
+```{r}
+cor_matrix = cor(new_df %>% select(!c("geo_label_city", "geo_fips_code", "date_label")), use = "na.or.complete")
+cor_matrix[,1]
+cor_melted <- as.data.frame(as.table(cor_matrix))
+
+# Filter to remove self-correlations and get only one of each pair
+cor_melted_filtered <- subset(cor_melted, Var1 != Var2 & as.numeric(Var1) < as.numeric(Var2))
+
+# Filter for high correlations
+high_cor_pairs <- subset(cor_melted_filtered, abs(Freq) > 0.75)
+print(high_cor_pairs)
+high_cor_pairs %>% group_by(Var1) %>% count() %>% arrange(desc(n))
+high_cor_pairs %>% group_by(Var2) %>% count() %>% arrange(desc(n))
+```
+Last variables droppped:
+
+We have left a lot of important variables that all seem to potentially important. We need to drop a few of these variables, so there is no perfect solution. These are what we finally dropped:
+- *People with Disabilities*: Seems like it could be represented by a number of other variables
+- *Vacant Housing Units*: Does not seem as important, high correlation with other variables
+- *Household Income Inequality*: very high correlation with poverty, also has high correlation with other variables
+- *Single-Parent Families*: This would also seem to be highly correlated with poverty
+- *Preschool Enrollment*: High correlation with college graduates which we like better
+- *Owner Occupied Housing*: Almost 1 correlation with *Renters vs. Owners*, which we are keeping
+- *Children*: Does not seem to predictive, there are better variables than this
+- *Primarily Speak Spanish*, *Primarily Speak English*: *Foreign Born Population* is highly correlated and seems like it could be more important
+- *Public Assistance*: This is highly correlated with poverty but we will be keeping the poverty variable
+- *Dental Care*: Has high correlations but does not seem to be as predictive as many of the other variables in this for livability
+- *New Tuberculosis Cases*: Not predictive
+- *Adult Physical Inactivity*: high correlation with others and not as predictive
+
+
+```{r}
+final_drop = c(
+  "People with Disabilities", "Vacant Housing Units", 
+  "Household Income Inequality", "Single-Parent Families",
+  "Preschool Enrollment", "Owner Occupied Housing", "Children",
+  "Primarily Speak Spanish", "Dental Care", "Primarily Speak English", "Public Assistance", "New Tuberculosis Cases", "Adult Physical Inactivity"
+)
+new_df = new_df %>% select(!any_of(final_drop))
+```
+## Final Correlations
+```{r}
+cor_matrix = cor(new_df %>% select(!c("geo_label_city", "geo_fips_code", "date_label")), use = "na.or.complete")
+cor_matrix[,1]
+cor_melted <- as.data.frame(as.table(cor_matrix))
+
+# Filter to remove self-correlations and get only one of each pair
+cor_melted_filtered <- subset(cor_melted, Var1 != Var2 & as.numeric(Var1) < as.numeric(Var2))
+
+# Filter for high correlations
+high_cor_pairs <- subset(cor_melted_filtered, abs(Freq) > 0.75)
+print(high_cor_pairs)
+high_cor_pairs %>% group_by(Var1) %>% count() %>% arrange(desc(n))
+high_cor_pairs %>% group_by(Var2) %>% count() %>% arrange(desc(n))
+```
+We are okay with a little bit of correlation, as long as it is not the majority of the dataset. We went from 400 pairs to only 6, and none of them are over .85, and if this is is still a problem we can reduce further. These are our variables with low correlations before some final domain understanding to further reduce to only important variables.
+
+- Prostate, Diabetes, Flu/Pneumonia deaths: Not a huge portion of deaths are in this way, does not seem too important
+- Homelessness and Vacant Housing: broad, covered by other homeless variabels
+
+```{r}
+colnames(new_df)
+unimp_vars = c("Prostate Cancer Deaths", "Poor Air Quality","Primarily Speak Chinese",  "Prostate Cancer Deaths", "Diabetes Deaths", "Pneumonia or Influenza Deaths", "Homelessness and Vacant Housing" )
+new_df = new_df %>% select(!all_of(unimp_vars))
+```
+
+## Final Variables for clustering
+```{r}
+colnames(new_df)
+```
+
+## base df on cities
+```{r}
+scaled = scale(new_df %>% select(!c(geo_label_city, geo_fips_code, date_label)))
+hc = hclust(dist(scaled))
+#hc = cutree(a, k = 5)
+cluster_assignments <- cutree(hc, k = 4)
+
+# Create a dataframe with cluster assignments
+df_clusters <- data.frame(new_df, Cluster = as.factor(cluster_assignments))
+df_clusters %>% select(geo_label_city, Cluster)
+```
+
+```{r}
+plot(hc, labels = FALSE) # Set labels=FALSE to avoid cluttering
+rect.hclust(hc, k = 4, border = "red") # Add rectangles to delineate the 4 clusters
+
+#rownames(new_df) = substr(new_df$geo_label_city, 1, 5)
+# Add text labels
+# Compute appropriate y positions for text labels (may need adjustment)
+y_positions <- rep(min(hc$height), length(cluster_assignments))
+text(x = 1:length(cluster_assignments), y = y_positions, labels = row.names(new_df), cex = 0.6, pos = 3)
+```
+
+
+## Hierarchical clustering on columns
+```{r}
+df_t <- t(scaled)
+
+# Calculate the distance matrix using Euclidean distance (you can choose another method)
+dist_matrix <- dist(df_t, method = "euclidean")
+
+# Perform hierarchical clustering
+hc_columns <- hclust(dist_matrix, method = "complete") # You can choose another linkage method
+
+# Plot the dendrogram
+plot(hc_columns, main = "Dendrogram of Columns", xlab = "Columns", sub = "", ylab = "Height")
+
+varclusters <- cutree(hc_columns, k = 5)
+
+# If you want to see which columns are in each cluster
+
+df_varclusters <- data.frame(df_t, Cluster = as.factor(varclusters)) %>% select(Cluster)
+```
+## Final Variable CLusters
+
+```{r}
+df_varclusters$varnames = rownames(df_varclusters)
+categories = df_varclusters %>% select(varnames, Cluster)
+categories
+```
 
 Things we could potentially predict:
 
@@ -148,3 +409,27 @@ Things we could potentially predict:
 - redlining: https://catalog.data.gov/dataset/redlining-maps-from-the-home-owners-loan-corporation-1937
 - Zip code: https://catalog.data.gov/dataset/places-local-data-for-better-health-zcta-data-2020-release-ea5f2
 - Places data: https://catalog.data.gov/dataset/places-local-data-for-better-health-county-data-2020-release-94305
+
+
+## Response Variable: 
+This section of our model will be attempting to predict the happiness of a city, from this source https://wallethub.com/edu/happiest-places-to-live/32619, using the data from our dataframe
+```{r}
+# Assuming the data is tab-separated
+happy <- read_csv("data/happiest_places_to_live.csv")
+happy <- happy %>% filter(!is.na(City))
+head(happy)
+## Edit names to make them equal
+happy <- happy %>%
+  mutate(City = ifelse(City == "Detroit, MI", "Detroit", City)) %>% 
+  mutate(City = ifelse(City == "Washington, DC", "Washington", City)) %>% 
+  mutate(City = ifelse(City == "New York", "New York City", City))
+```
+
+```{r}
+## Join 
+joined = cities_clean %>% left_join(happy, by = join_by(geo_label_city == City))
+response_cols = joined %>% select(any_of(colnames(happy)))
+colnames(response_cols)
+```
+
+
