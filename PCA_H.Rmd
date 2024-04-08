@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## R Markdown
 
-#Using Jebb's code for cleaning data
+#Using Max's/Jebb's code for cleaning data
 
 ```{r}
 library(readr)
@@ -30,23 +30,185 @@ total = data %>% filter(geo_label_citystate == "U.S. Total")
 #Taking out na values and only using 2021
 cities <- read_csv("bigcities_wide.csv")
 us_total = cities %>% filter(geo_label_city == "U.S. Total")
-## Work with 2021 
+
+
+#### From Max' cleaning
+imp = data %>% select(metric_item_label, geo_label_city, geo_fips_code, value,date_label)
+wide = imp %>% pivot_wider( names_from = metric_item_label, values_from = value)
+## Write csv
+# write.csv(wide, file = "/Users/nicolaibogh/Library/CloudStorage/OneDrive-KøbenhavnsUniversitet/Kandidat/UNC/STOR565 MACHINE LEARNING/StorGitHub/stor565MLproject/bigcities_wide.csv", row.names = FALSE)
+
+
+
+cities = read_csv("bigcities_wide.csv")
+us_total = cities %>% filter(geo_label_city == "U.S. Total")
+## Work with 2021 or 2020 data
 new_cities = cities %>% filter(date_label == 2021)
 na_count = colSums(is.na(new_cities)) / nrow(new_cities)
 lowna = na_count[colSums(is.na(new_cities)) / nrow(new_cities) < .33]
 lowna_cols = names(lowna)
 cities_nona = new_cities %>% select(all_of(lowna_cols))
-non_zero_sd_columns <- apply(cities, 2, sd) != 0
-
-#Jeb for you
-df <- cities_nona %>%
+## Impute as dataframe
+cities_clean <- cities_nona %>%
   mutate(across(where(is.numeric), ~ifelse(is.na(.), median(., na.rm = TRUE), .)))
-df
-latest_filtered = df
+
+
+numeric_data <- cities_clean[, -1]  # Exclude the first column containing city names
+transposed_data <- t(numeric_data)   # Transpose the numeric data
+# Set column names to city names
+colnames(transposed_data) <- cities_clean$geo_label_city
+# Now transposed_data contains the numeric variables as rows and cities as columns
+
+### test 2
+city_var <- numeric_data
+rownames(city_var) <- cities_clean$geo_label_city
+
+# Removing "geo_fips_code" and "date_label"
+transposed_data <- transposed_data[-c(1:2), ]
+
+
+```
+
+```{r}
+# replace transposed_data / city_var depending on if we want groupings for the variables or the cities
+# Perform PCA
+pca_result <- prcomp(transposed_data, scale. = TRUE)
+summary(pca_result)
+plot(pca_result$x[,1], pca_result$x[,2])
+pca.var <- pca_result$sdev^2
+# percantage of variation that each PCA accounts for
+pca.var.per <- round(pca.var/sum(pca.var)*100, 1)
+barplot(pca.var.per, main="Scree Plot", xlab="Principal Component", ylab="Percent Variation")
+```
+
+    - The PCA results show that the first principal component (PC1) explains the majority of the variation in the data, with a proportion of variance of 96.5%.
+    - The subsequent principal components (PC2, PC3, etc.) each explain a smaller proportion of the variance, with PC2 explaining 2.4% and PC3 explaining 1.2% of the variance.
+    - After PC3, the proportion of variance explained by each additional principal component becomes negligible (close to 0%).
+  
+The scree plot visualizes the proportion of variance explained by each principal component. In the scree plot, the first few principal components (PC1, PC2, and PC3) explained the majority of the variance, while subsequent components explain less and less. PC1, PC2, and PC3 are the most significant components, as they have relatively high proportions of variance.
+
+```{r}
+##### PCA continued
+library(ggplot2)
+ 
+pca.data <- data.frame(Sample=rownames(pca_result$x),
+  X=pca_result$x[,1],
+  Y=pca_result$x[,2])
+pca.data
+ 
+ggplot(data=pca.data, aes(x=X, y=Y, label=Sample)) +
+  geom_text() +
+  xlab(paste("PC1 - ", pca.var.per[1], "%", sep="")) +
+  ylab(paste("PC2 - ", pca.var.per[2], "%", sep="")) +
+  theme_bw() +
+  ggtitle("PCA Graph")
+ 
+## get the name of the top 10 measurements (cities) that contribute most to pc1.
+loading_scores <- pca_result$rotation[,1]
+city_scores <- abs(loading_scores) ## get the magnitudes
+city_score_ranked <- sort(city_scores, decreasing=TRUE)
+top_10_cities <- names(city_score_ranked[1:10])
+ 
+top_10_cities ## show the names of the top 10 cities
+ 
+pca_result$rotation[top_10_cities,1]
+
+```
+
+# Hierarchical clustering with PCA
+```{r}
+num_components <- 3  # number of principal components
+
+# Extracting PCA scores for selected components
+pca_scores <- pca_result$x[, 1:num_components]
+
+# Performing hierarchical clustering
+hc_result <- hclust(dist(pca_scores), method = "complete")
+
+# Visualizing hierarchical clustering results
+plot(hc_result, main = "Hierarchical Clustering Dendrogram")
+
+# heatmap to visualize clustered samples
+cluster_order <- cutree(hc_result, k = 3)  
+heatmap(pca_scores[order(cluster_order), ], scale = "row", 
+        Rowv = NA, Colv = NA, col = heat.colors(256),
+        main = "Clustered Samples Heatmap")
+
+```
+
+```{r}
+# ELBOW METHOD
+#set.seed(6)
+# Make an empty vector we'll populate via our loop
+wcss <- numeric(length = 10)
+
+# For our 10 clusters we'll start with
+for (i in 1:10) {
+  wcss[i] <- sum(kmeans(pca_scores, i)$withinss)
+}
+
+plot(1:10,
+     wcss,
+     type = 'b', # for lines and points
+     main = 'The Elbow Method',
+     xlab = 'Number of clusters',
+     ylab = 'WCSS')
+
+
 ```
 
 
-# hierarchical clustering
+```{r}
+# Silhouette Analysis
+library(cluster)
+
+# Function to calculate silhouette score for hierarchical clustering
+silhouette_score <- function(k, pca_scores){
+  hc <- hclust(dist(pca_scores), method = "complete")
+  cluster_assignments <- cutree(hc, k = k)
+  ss <- silhouette(cluster_assignments, dist(pca_scores))
+  mean(ss[, 3])
+}
+
+# Range of clusters to consider
+k <- 2:10
+
+# Calculate average silhouette scores for each number of clusters
+avg_sil <- sapply(k, silhouette_score, pca_scores)
+
+# Plot average silhouette scores
+plot(k, avg_sil, type='b', xlab='Number of Clusters', ylab='Average Silhouette Scores', frame=FALSE,
+     main = "Silhouette Analysis for Hierarchical Clustering")
+
+
+
+library(factoextra)
+# Perform hierarchical clustering
+hc <- hclust(dist(pca_scores), method = "complete")
+
+# Compute silhouette widths for different numbers of clusters
+sil_width <- fviz_nbclust(pca_scores, FUNcluster = hcut, method = "silhouette")
+
+# Plot the results
+print(sil_width)
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+# hierarchical clustering OLD VERSION
 ```{r, fig.width=8, fig.height=10}
 library(cluster)
 library(dendextend)
@@ -60,6 +222,19 @@ hierarchical_clusters <- hclust(distance_matrix)
 dend <- as.dendrogram(hierarchical_clusters) # Visualizing dendrogram with actual column names
 labels(dend) <- colnames(data_for_clustering) # Adding names as labels
 plot(dend, main = "Dendrogram for Hierarchical Clustering", horiz = TRUE)
+
+########### Ordering clusters
+# HC
+num_clusters <- 5  # Adjustable
+clusters <- cutree(hierarchical_clusters, k = num_clusters)
+
+# order of observations
+order <- order.dendrogram(dend)
+
+# DF with the labels and cluster assignments
+cluster_labels <- data.frame(Label = labels(dend)[order], Cluster = clusters[order])
+
+View(cluster_labels)
 
 
 ```
@@ -80,7 +255,7 @@ Instead, we can use the increase in the agglomeration coefficients between each 
 # Perform HC for different numbers of clusters
 wss <- c()
 for (i in 2:10) {
-  hierarchical_clusters <- hclust(distance_matrix, method = "average")
+  hierarchical_clusters <- hclust(distance_matrix, method = "ward.D2")
   wss[i - 1] <- sum((hierarchical_clusters$height)^2)
 }
 # from ?hclust: the agglomeration method to be used. This should be (an unambiguous abbreviation of) one of "ward.D", "ward.D2", "single", "complete", "average" (= UPGMA), "mcquitty" (= WPGMA), "median" (= WPGMC) or "centroid" (= UPGMC).
@@ -116,6 +291,21 @@ print(silhouette_score)
 # Plotting silhouette width
 plot(silhouette_score, main = "Silhouette Plot for Hierarchical Clustering")
 ```
+
+TO DO:
+
+PCA HC
+  - Elbow method
+  - High Dimentionality
+  
+1) Do initial Hierarchical Cluster(done)
+2) Initial Kmeans Clustering(Jeb)
+3) Do PCA → HC:(Nicolai)
+    - PCA plot (kinda like Elbow)
+4) Drop highly correlated variables: 10-20 variables (Max) --> HC
+5) Compare clusters→get final clusters
+6) Use this to predict on something
+
 
 
 
