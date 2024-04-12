@@ -412,7 +412,9 @@ Things we could potentially predict:
 
 
 ## Response Variable: 
+
 This section of our model will be attempting to predict the happiness of a city, from this source https://wallethub.com/edu/happiest-places-to-live/32619, using the data from our dataframe
+
 ```{r}
 # Assuming the data is tab-separated
 happy <- read_csv("data/happiest_places_to_live.csv")
