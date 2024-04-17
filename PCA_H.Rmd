@@ -54,18 +54,13 @@ cities_clean <- cities_nona %>%
 
 
 numeric_data <- cities_clean[, -1]  # Exclude the first column containing city names
-transposed_data <- t(numeric_data)   # Transpose the numeric data
+transposed_data <- numeric_data   # Transpose the numeric data
 # Set column names to city names
-colnames(transposed_data) <- cities_clean$geo_label_city
+# colnames(transposed_data) <- cities_clean$geo_label_city
 # Now transposed_data contains the numeric variables as rows and cities as columns
 
-### test 2
-city_var <- numeric_data
-rownames(city_var) <- cities_clean$geo_label_city
-
 # Removing "geo_fips_code" and "date_label"
-transposed_data <- transposed_data[-c(1:2), ]
-
+transposed_data <- transposed_data[,-c(1:2) ]
 
 ```
 
@@ -81,17 +76,12 @@ pca.var.per <- round(pca.var/sum(pca.var)*100, 1)
 barplot(pca.var.per, main="Scree Plot", xlab="Principal Component", ylab="Percent Variation")
 ```
 
-    - The PCA results show that the first principal component (PC1) explains the majority of the variation in the data, with a proportion of variance of 96.5%.
-    - The subsequent principal components (PC2, PC3, etc.) each explain a smaller proportion of the variance, with PC2 explaining 2.4% and PC3 explaining 1.2% of the variance.
-    - After PC3, the proportion of variance explained by each additional principal component becomes negligible (close to 0%).
-  
-The scree plot visualizes the proportion of variance explained by each principal component. In the scree plot, the first few principal components (PC1, PC2, and PC3) explained the majority of the variance, while subsequent components explain less and less. PC1, PC2, and PC3 are the most significant components, as they have relatively high proportions of variance.
 
 ```{r}
 ##### PCA continued
 library(ggplot2)
  
-pca.data <- data.frame(Sample=rownames(pca_result$x),
+pca.data <- data.frame(Sample=colnames(pca_result$x),
   X=pca_result$x[,1],
   Y=pca_result$x[,2])
 pca.data
@@ -183,114 +173,121 @@ plot(k, avg_sil, type='b', xlab='Number of Clusters', ylab='Average Silhouette S
 
 
 library(factoextra)
-# Perform hierarchical clustering
+# Performing hierarchical clustering
 hc <- hclust(dist(pca_scores), method = "complete")
 
-# Compute silhouette widths for different numbers of clusters
+# Computing silhouette widths for different numbers of clusters
 sil_width <- fviz_nbclust(pca_scores, FUNcluster = hcut, method = "silhouette")
 
-# Plot the results
+# Plotting the results
 print(sil_width)
 
+cluster_assignments <- cutree(hc, k = 4)
+# Visualizing the clusters
+fviz_cluster(list(data = pca_scores, cluster = cluster_assignments),
+             geom = "point", 
+             stand = FALSE,  # preventing scaling of variables
+             palette = "jco"
+             )
 
 
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-
-# hierarchical clustering OLD VERSION
-```{r, fig.width=8, fig.height=10}
-library(cluster)
-library(dendextend)
-
-# Only all numeric columns
-data_for_clustering <- select(latest_filtered, where(is.numeric))
-
-distance_matrix <- dist(data_for_clustering) # calculating distance matrix
-hierarchical_clusters <- hclust(distance_matrix)
-
-dend <- as.dendrogram(hierarchical_clusters) # Visualizing dendrogram with actual column names
-labels(dend) <- colnames(data_for_clustering) # Adding names as labels
-plot(dend, main = "Dendrogram for Hierarchical Clustering", horiz = TRUE)
-
-########### Ordering clusters
-# HC
-num_clusters <- 5  # Adjustable
-clusters <- cutree(hierarchical_clusters, k = num_clusters)
-
-# order of observations
-order <- order.dendrogram(dend)
-
-# DF with the labels and cluster assignments
-cluster_labels <- data.frame(Label = labels(dend)[order], Cluster = clusters[order])
-
-View(cluster_labels)
-
-
-```
-
-
-I want to plot a graph of the within-cluster sum of squares (WSS) or variance against the number of clusters. The "elbow" point in the plot should represents the optimal number of clusters where adding more clusters does not significantly decrease the WSS. This method is more commonly used for k-means clustering but should also provide insights for hierarchical clustering.
-
-To create a graph of the WSS or variance against the number of clusters (Elbow Method) for hierarchical clustering, we need to perform hierarchical clustering for different numbers of clusters and calculate the WSS or variance for each. However, hierarchical clustering does not directly provide WSS or variance values.
-
-Instead, we can use the increase in the agglomeration coefficients between each step of the hierarchical clustering as a measure of "inertia" or "variance." The agglomeration coefficient represents the increase in distance between clusters as they are merged. A larger increase indicates that the clusters being merged are more different from each other, which can be interpreted as higher within-cluster variance.
-
-    - I loop through different numbers of clusters from 2 to 10.
-    - For each number of clusters, I perform hierarchical clustering using the hclust() function and calculate the WSS using the agglomeration coefficients.
-    - I then plot the number of clusters against the WSS to visualize the Elbow Method graph.
+## Cluster profiling
 
 ```{r}
-#################### Elbow Method  ####################
-# Perform HC for different numbers of clusters
-wss <- c()
-for (i in 2:10) {
-  hierarchical_clusters <- hclust(distance_matrix, method = "ward.D2")
-  wss[i - 1] <- sum((hierarchical_clusters$height)^2)
-}
-# from ?hclust: the agglomeration method to be used. This should be (an unambiguous abbreviation of) one of "ward.D", "ward.D2", "single", "complete", "average" (= UPGMA), "mcquitty" (= WPGMA), "median" (= WPGMC) or "centroid" (= UPGMC).
+# Extracting cluster assignments
+# Retrieving the cluster assignments obtained from HC.
+cluster_assignments <- cutree(hc_result, k = 3)  
 
-# Plotting the Elbow Method graph
-plot(2:10, wss, type = "b", pch = 19, frame = FALSE, 
-     xlab = "Number of Clusters", ylab = "Within-cluster Sum of Squares",
-     main = "Elbow Method for Hierarchical Clustering")
+# Profile clusters
+library(dplyr)
+
+# Combine cluster assignments with original data
+clustered_data <- cbind(cluster_assignments, transposed_data)
+
+# Calculating mean values of variables within each cluster
+cluster_means <- clustered_data %>%
+  group_by(cluster_assignments) %>%
+  summarise_all(mean)
+print(cluster_means)
+
+# Identifying distinguishing variables
+# Combine cluster assignments with original data
+clustered_data <- cbind(cluster_assignments, transposed_data)
+
+# Calculate mean or median values of variables within each cluster
+cluster_summary <- clustered_data %>%
+  group_by(cluster_assignments) %>%
+  summarise_all(mean) 
+
+# Identify distinguishing variables
+# calculating coefficient of variation
+coefficient_of_variation <- apply(cluster_summary[, -1], 2, function(x) sd(x) / mean(x))
+
+# Printing variables with highest coefficient of variation
+top_variables <- names(sort(coefficient_of_variation, decreasing = TRUE)[1:5])
+print(top_variables)
+
+# ANOVA, to perform statistical tests to assess significance
+anova_results <- lapply(clustered_data[, -1], function(x) {
+  aov_result <- aov(x ~ cluster_assignments, data = clustered_data)
+  summary(aov_result)
+})
+# print(anova_results)
+
+# visualizing the distribution of each variable across clusters using box plots, histograms, etc.
+# Box plot for one variable
+ggplot(clustered_data, aes(x = as.factor(cluster_assignments), y = Homicides)) +
+  geom_boxplot() +
+  labs(x = "Cluster", y = "Homicides") +
+  ggtitle("Distribution of Variable of Interest across Clusters")
+
+
+# Get variables contributing most to the first principal component
+loading_scores <- pca_result$rotation[,1]
+top_variables <- names(sort(abs(loading_scores), decreasing = TRUE)[1:5])
+print(top_variables)
+
+# Compare mean values of these variables across clusters
+top_variables_comparison <- clustered_data %>%
+  group_by(cluster_assignments) %>%
+  summarise(across(all_of(top_variables), mean))
+
+# Visualize comparison
+print(top_variables_comparison)
 
 
 ```
 
-Unfortunately, the plot for the Elbow Method graph appears as a horizontal line rather than having a clear "elbow" shape. This could suggest that there might not be a distinct optimal number of clusters based on the WSS or variance.
 
-I have checked different hierarchical clustering methods (e.g., single linkage, complete linkage, average linkage, Ward's method) but they do not produce different results. The choice of method could affect the shape of the Elbow Method graph but doesn't in this case.
+   - Premature Death: Cluster 3 has the highest mean premature death rate (16174), followed by cluster 2 (10398), and then cluster 1 (6699). This indicates that cluster 3 generally has a higher premature death rate compared to the other clusters.
 
-One reason why the plot for the Elbow Method graph appears as a horizontal line rather than having a clear "elbow" shape could be because of the dimensionality of the data. Since we have a high-dimensional dataset for the clustering (36 obs. of 94 variables), the Elbow Method may not be as effective, as the concept of "elbow" becomes less clear in higher-dimensional spaces.
-Other factors could be the presence of noise or outliers in the data, which can also affect the clustering results and make it difficult to identify a clear elbow.
+  - Households with Higher Incomes: Cluster 1 has the highest mean percentage of households with higher incomes (63.9%), followed by cluster 2 (51.4%), and then cluster 3 (34.4%). This suggests that cluster 1 tends to have a higher proportion of households with higher incomes compared to the other clusters.
+
+  - Life Expectancy: Cluster 1 has the highest mean life expectancy (78.5 years), followed by cluster 2 (73.6 years), and then cluster 3 (68.7 years). This indicates that cluster 1 generally has a higher life expectancy compared to the other clusters.
+
+
+## Classification Task
+
+In the classification task, I predict the cluster membership based on other variables.
 
 ```{r}
-# Calculating the hierarchical clustering
-distance_matrix <- dist(data_for_clustering)
-hierarchical_clusters <- hclust(distance_matrix)
 
-# Cutting the dendrogram to get clusters
-num_clusters <- 3  # Adjust this based on your dendrogram
-clusters <- cutree(hierarchical_clusters, k = num_clusters)
 
-# Calculating silhouette score
-silhouette_score <- silhouette(clusters, dist = as.dist(distance_matrix))
-print(silhouette_score)
 
-# Plotting silhouette width
-plot(silhouette_score, main = "Silhouette Plot for Hierarchical Clustering")
+
+
 ```
+
+
+
+
+
+
+
+############## DO NOT USE #####################
+
 
 TO DO:
 
