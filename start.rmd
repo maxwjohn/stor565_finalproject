@@ -398,6 +398,12 @@ categories = df_varclusters %>% select(varnames, Cluster)
 categories
 ```
 
+```{r}
+
+```
+
+
+
 Things we could potentially predict:
 
 - Consumer Price Index: https://fred.stlouisfed.org/series/CPIAUCSL

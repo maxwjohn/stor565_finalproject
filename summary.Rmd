@@ -1,0 +1,65 @@
+---
+title: "summary"
+author: "Max"
+date: "2024-04-13"
+output: html_document
+---
+
+## Initial dataframe imported/edited (widened)
+
+Initial dataframe has thousands of rows which are the metrics, and each row corresponds to a different group. 
+Unsupervised setting, this is a domain understanding project. There is no prediction, we are mostly trying to create our own grade/grouping of major US cities. This is subjective though, there is no specific rating, so we are going to attempt to do this ourselves. 
+
+## Initial dataframe edited: dropped variables
+
+```{r}
+cities_clean
+```
+```{r}
+numeric_data ## numeric data no id vars
+```
+
+
+### initial data analysis
+CHecked correlations, histograms of data. 
+Found high correlations, makes sense for hi-d with low n. 
+Tried 2 methods of dimension reduction:
+  - Feature selection through domain selection
+  - PCA
+
+```{r}
+##pca_result is pca
+pca_df = pca_result$x
+feat_sel_df = new_df
+```
+
+## Clustering
+
+```{r}
+## From feature selection
+df_clusters  ## City clusters
+df_clusters %>% select(geo_label_city, Cluster)
+categories ## variables
+## From pca
+cluster_labels$cities = rownames(cluster_labels)
+```
+
+## Analyzing differences
+```{r}
+diff = cluster_labels %>% left_join(
+  df_clusters %>% select(geo_label_city, Cluster), by = join_by("cities" == "geo_label_city")
+)
+```
+
+
+```{r}
+View(categories)
+```
+
+
+
+## Prediction of quality of cities:
+  1) groupings: nonlinear
+  2) indexes--> PC or through 
+
+

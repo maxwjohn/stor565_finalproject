@@ -1,0 +1,161 @@
+---
+title: "PCA"
+author: "Nicolai"
+date: "2024-03-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+#Using Max's/Jebb's code for cleaning data
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+#setwd("/Users/nicolaibogh/Library/CloudStorage/OneDrive-KøbenhavnsUniversitet/Kandidat/UNC/STOR565 MACHINE LEARNING/StorGitHub/stor565MLproject")
+# data <- read_csv("bigcitiesall.csv")
+# total = data %>% filter(geo_label_citystate == "U.S. Total")
+```
+
+
+
+```{r}
+#Clean data code (data defined as latest_filtered)
+#Taking out na values and only using 2021
+cities <- read_csv("data/bigcities_wide.csv")
+us_total = cities %>% filter(geo_label_city == "U.S. Total")
+
+
+#### From Max' cleaning
+#imp = cities %>% select(metric_item_label, geo_label_city, geo_fips_code, value,date_label)
+#wide = imp %>% pivot_wider( names_from = metric_item_label, values_from = value)
+## Write csv
+# write.csv(wide, file = "/Users/nicolaibogh/Library/CloudStorage/OneDrive-KøbenhavnsUniversitet/Kandidat/UNC/STOR565 MACHINE LEARNING/StorGitHub/stor565MLproject/bigcities_wide.csv", row.names = FALSE)
+
+
+
+cities = read_csv("data/bigcities_wide.csv")
+us_total = cities %>% filter(geo_label_city == "U.S. Total")
+## Work with 2021 or 2020 data
+new_cities = cities %>% filter(date_label == 2021)
+na_count = colSums(is.na(new_cities)) / nrow(new_cities)
+lowna = na_count[colSums(is.na(new_cities)) / nrow(new_cities) < .33]
+lowna_cols = names(lowna)
+cities_nona = new_cities %>% select(all_of(lowna_cols))
+## Impute as dataframe
+cities_clean <- cities_nona %>%
+  mutate(across(where(is.numeric), ~ifelse(is.na(.), median(., na.rm = TRUE), .)))
+
+
+numeric_data <- cities_clean %>% filter(geo_label_city != "U.S. Total") %>% select(!c("geo_label_city", "geo_fips_code", "date_label")) # Exclude the first column containing city names
+rownames(numeric_data) = cities_clean$geo_label_city  # Transpose the numeric data
+# Set column names to city names
+#colnames(transposed_data) <- cities_clean$geo_label_city
+# Now transposed_data contains the numeric variables as rows and cities as columns
+
+### test 2
+#city_var <- numeric_data
+#rownames(city_var) <- cities_clean$geo_label_city
+
+# Removing "geo_fips_code" and "date_label"
+#transposed_data <- transposed_data[-c(1:2), ]
+```
+
+```{r}
+# replace transposed_data / city_var depending on if we want groupings for the variables or the cities
+# Perform PCA
+pca_result <- prcomp(numeric_data, scale. = TRUE)
+summary(pca_result)
+plot(pca_result$x[,1], pca_result$x[,2])
+pca.var <- pca_result$sdev^2
+# percantage of variation that each PCA accounts for
+pca.var.per <- round(pca.var/sum(pca.var)*100, 1)
+barplot(pca.var.per, main="Scree Plot", xlab="Principal Component", ylab="Percent Variation")
+```
+
+```{r}
+#pca_result$rotation
+```
+
+
+```{r}
+##### PCA continued
+library(ggplot2)
+## get the name of the top 10 measurements (cities) that contribute most to pc1.
+loading_scores <- pca_result$rotation[,1]
+var_scores <- abs(loading_scores) ## get the magnitudes
+var_score_ranked <- sort(var_scores, decreasing=TRUE)
+top_10_vars <- names(var_score_ranked[1:10])
+ 
+top_10_vars ## show the names of the top 10 cities
+ 
+pca_result$rotation[top_10_vars,1]
+```
+
+# Hierarchical clustering with PCA
+```{r}
+num_components <- 3  # number of principal components
+
+# Extracting PCA scores for selected components
+pca_scores <- pca_result$x[, 1:10]
+
+# Performing hierarchical clustering
+hc_result <- hclust(dist(pca_scores), method = "complete")
+
+# Visualizing hierarchical clustering results
+plot(hc_result, main = "Hierarchical Clustering Dendrogram")
+
+# heatmap to visualize clustered samples
+cluster_order <- cutree(hc_result, k = 3)  
+heatmap(pca_scores[order(cluster_order), ], scale = "row", 
+        Rowv = NA, Colv = NA, col = heat.colors(256),
+        main = "Clustered Samples Heatmap")
+
+```
+```{r, fig.width=8, fig.height=10}
+dend <- as.dendrogram(hc_result) # Visualizing dendrogram with actual column names
+#labels(dend) <- rownames(numeric_data) # Adding names as labels
+plot(dend, main = "Dendrogram for Hierarchical Clustering", horiz = TRUE)
+
+########### Ordering clusters
+# HC
+num_clusters <- 3  # Adjustable
+clusters <- cutree(hc_result, k = num_clusters)
+
+# order of observations
+order <- order.dendrogram(dend)
+
+# DF with the labels and cluster assignments
+cluster_labels <- data.frame( Cluster = clusters[order])
+
+View(cluster_labels)
+```
+
+
+
+TO DO:
+
+PCA HC
+  - Elbow method
+  - High Dimentionality
+  
+1) Do initial Hierarchical Cluster(done)
+2) Initial Kmeans Clustering(Jeb)
+3) Do PCA → HC:(Nicolai)
+    - PCA plot (kinda like Elbow)
+4) Drop highly correlated variables: 10-20 variables (Max) --> HC
+5) Compare clusters→get final clusters
+6) Use this to predict on something
+
+```{r}
+
+```
+
+
+
