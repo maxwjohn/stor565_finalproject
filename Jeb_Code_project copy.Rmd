@@ -285,6 +285,9 @@ Run all your code on Max's reduced Dataframe in branch Start.rmd (run all the co
 
 Using new_df (dataframe without highly correlated variables)
 ```{r}
+new_df = (read.csv("new_df.csv"))
+
+scale_new_df = scale(new_df[,2:ncol(new_df)])
 #kmeans
 colnames(scale_new_df)
 # Assuming 'latest_data_num' is your prepared data matrix or data frame
@@ -301,7 +304,6 @@ print(kmeans_result$centers)
 
 # Print cluster sizes
 table(cluster_assignments)
-
 
 ```
 Now lets see what k-means looks like with 3 clusters on the reduced dataset from Max's code
@@ -331,8 +333,11 @@ Finding the cities in each cluster
 
 ```{r}
 #Now that we have completed K-means on the reduced data set, lets visualize the cities we found in each cluster
-new_df$Cluster <- cluster_assignments
-new_df[, c("geo_label_city", "Cluster")]
+View(new_df)
+scale_new_df = scale(new_df[,2:ncol(new_df)])
+View(scale_new_df)
+scale_new_df$Cluster <- cluster_assignments
+#scale_new_df[, c("geo_label_city", "Cluster")]
 # Ensure the first column has a name, if not already named (replace 'ID' with your chosen name)
 names(new_df)[1] <- "ID"
 
@@ -352,7 +357,9 @@ print(cluster3)
 
 
 
+```{r}
 
+```
 
 
 
