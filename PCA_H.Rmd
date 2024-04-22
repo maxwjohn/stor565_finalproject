@@ -61,21 +61,68 @@ transposed_data <- numeric_data   # Transpose the numeric data
 
 # Removing "geo_fips_code" and "date_label"
 transposed_data <- transposed_data[,-c(1:2) ]
+# removing US total )first row='
+transposed_data <- transposed_data[-1, ]
 
 ```
 
 ```{r}
+library(factoextra)
+
 # replace transposed_data / city_var depending on if we want groupings for the variables or the cities
 # Perform PCA
 pca_result <- prcomp(transposed_data, scale. = TRUE)
 summary(pca_result)
 plot(pca_result$x[,1], pca_result$x[,2])
 pca.var <- pca_result$sdev^2
+
+# Check the standard deviations of the principal components
+std_dev <- pca_result$sdev
+
 # percantage of variation that each PCA accounts for
 pca.var.per <- round(pca.var/sum(pca.var)*100, 1)
 barplot(pca.var.per, main="Scree Plot", xlab="Principal Component", ylab="Percent Variation")
+
+# More focused version
+fviz_eig(pca_result, addlabels = TRUE)
 ```
 
+With the biplot, it is possible to visualize the similarities and dissimilarities between the samples, and further shows the impact of each attribute on each of the principal components.
+```{r}
+# Graph of the variables
+fviz_pca_var(pca_result, col.var = "black")
+```
+Variables that are negatively correlated are displayed to the opposite sides of the biplot’s origin. 
+
+The goal of the third visualization is to determine how much each variable is represented in a given component. Such a quality of representation is called the Cos2 and corresponds to the square cosine, and it is computed using the fviz_cos2 function.
+
+  - A low value means that the variable is not perfectly represented by that component. 
+  - A high value, on the other hand, means a good representation of the variable on that component.
+
+```{r}
+fviz_cos2(pca_result, choice = "var", axes = 1:2)
+```
+
+The code above computed the square cosine value for each variable with respect to the first two principal components. 
+From the illustration above, X, X, X, and X are the top four variables with the highest cos2, hence contributing the most to PC1 and PC2.
+
+
+***Biplot combined with cos2***
+
+The last two visualization approaches: biplot and attributes importance can be combined to create a single biplot, where attributes with similar cos2 scores will have similar colors.  This is achieved by fine-tuning the fviz_pca_var function as follows:  
+
+```{r}
+fviz_pca_var(pca_result, col.var = "cos2",
+             gradient.cols = c("black", "orange", "green"),
+             repel = TRUE)
+```
+From the biplot above:
+
+  - High cos2 attributes are colored in green:
+  
+  - Mid cos2 attributes have an orange color:
+  
+  - Finally, low cos2 attributes have a black color:
 
 ```{r}
 ##### PCA continued
@@ -84,9 +131,9 @@ library(ggplot2)
 pca.data <- data.frame(Sample=colnames(pca_result$x),
   X=pca_result$x[,1],
   Y=pca_result$x[,2])
-pca.data
+pca.data[1:12,]
  
-ggplot(data=pca.data, aes(x=X, y=Y, label=Sample)) +
+ggplot(data=pca.data[1:12,], aes(x=X, y=Y, label=Sample)) +
   geom_text() +
   xlab(paste("PC1 - ", pca.var.per[1], "%", sep="")) +
   ylab(paste("PC2 - ", pca.var.per[2], "%", sep="")) +
@@ -107,7 +154,7 @@ pca_result$rotation[top_10_cities,1]
 
 # Hierarchical clustering with PCA
 ```{r}
-num_components <- 3  # number of principal components
+num_components <- 12  # number of principal components
 
 # Extracting PCA scores for selected components
 pca_scores <- pca_result$x[, 1:num_components]
@@ -198,7 +245,7 @@ fviz_cluster(list(data = pca_scores, cluster = cluster_assignments),
 ```{r}
 # Extracting cluster assignments
 # Retrieving the cluster assignments obtained from HC.
-cluster_assignments <- cutree(hc_result, k = 3)  
+cluster_assignments <- cutree(hc_result, k = 4)  
 
 # Profile clusters
 library(dplyr)
@@ -261,26 +308,26 @@ print(top_variables_comparison)
 ```
 
 
-   - Premature Death: Cluster 3 has the highest mean premature death rate (16174), followed by cluster 2 (10398), and then cluster 1 (6699). This indicates that cluster 3 generally has a higher premature death rate compared to the other clusters.
+   - Premature Death: Cluster 2 has the highest mean premature death rate (15215.), followed by cluster 1 (9834.), and then cluster 3 (6848.). This indicates that cluster 2 generally has a higher premature death rate compared to the other clusters.
 
-  - Households with Higher Incomes: Cluster 1 has the highest mean percentage of households with higher incomes (63.9%), followed by cluster 2 (51.4%), and then cluster 3 (34.4%). This suggests that cluster 1 tends to have a higher proportion of households with higher incomes compared to the other clusters.
+  - Households with Higher Incomes: At the same time, Cluster 3 has the highest mean percentage of households with higher incomes (63.1%), followed by cluster 1 (52.6%), and then cluster 2 (39.2%). This suggests that cluster 3 tends to have a higher proportion of households with higher incomes compared to the other clusters.
 
-  - Life Expectancy: Cluster 1 has the highest mean life expectancy (78.5 years), followed by cluster 2 (73.6 years), and then cluster 3 (68.7 years). This indicates that cluster 1 generally has a higher life expectancy compared to the other clusters.
-
-
-## Classification Task
-
-In the classification task, I predict the cluster membership based on other variables.
+  - Life Expectancy: Cluster 3 has the highest mean life expectancy (78.4 years), followed by cluster 1 (73.9 years), and then cluster 2 (69.6 years). This indicates that cluster 3 generally has a higher life expectancy compared to the other clusters.
 
 ```{r}
+# Computing correlations between original variables and principal components
+correlation_matrix <- cor(transposed_data, pca_result$x[, 1:12])
 
+# Display correlation matrix
+# print(correlation_matrix)
 
-
-
+# Interpret correlations
+# interpreting the first principal component, it will examine its correlations with the original variables.
+correlations_pc1 <- correlation_matrix[, 1]  # Correlations with the first principal component
+# print(correlations_pc1)
+# Interpret other principal components in a similar manner
 
 ```
-
-
 
 
 
@@ -303,6 +350,24 @@ PCA HC
 5) Compare clusters→get final clusters
 6) Use this to predict on something
 
+Use only the first 12 principals components
+
+
+Sankey plot:
 
 
 
+get the mean of each principal components
+adult obesity
+teen births
+
+
+reduced dataset Max
+newdf.csv
+
+Use euclidian 
+
+Ridge, Lasso, Elastic net?
+Feature importance?
+
+"ward performed best based on adjusted rand index"
