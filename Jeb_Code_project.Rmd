@@ -356,8 +356,91 @@ print(cluster3)
 
 
 
+#Code for final project  (4/22/2024)
+```{r}
+#pca_health$x
+k = 4
+kmeans_result <- kmeans(pca_health$x[,1:12], centers = k)
+
+pca_cluster = data.frame((kmeans_result$cluster), (latest_filtered_clean[1]))
+
+View(pca_cluster)
+
+write.csv(pca_cluster, "K_means_Cluster_4.csv", row.names = FALSE)
+
+
+k = 3
+kmeans_result <- kmeans(pca_health$x[,1:12], centers = k)
+
+pca_cluster = data.frame((kmeans_result$cluster), (latest_filtered_clean[1]))
+
+View(pca_cluster)
+
+write.csv(pca_cluster, "K_means_Cluster_3.csv", row.names = FALSE)
+
+```
+
+Now I will plot the cities onto PC1 and PC2 and indicate which cluster assignment each point has based on color
 
 ```{r}
+# Load necessary libraries
+library(ggplot2)
+
+# Assume pca_health contains PCA results, and 'df' is your DataFrame with city and cluster
+# Let's create a new data frame that includes PCA results and the cluster information
+# Extract the first two principal components
+pca_df <- data.frame(PC1 = pca_health$x[,1], PC2 = pca_health$x[,2])
+df = read.csv("K_means_Cluster_3.csv")
+df$City = df[,2]
+df$Cluster = df[,1]
+# Add city and cluster information assuming 'df' has columns 'City' and 'Cluster'
+pca_df$City <- df$City
+pca_df$Cluster <- df$Cluster
+
+# Create the plot with adjusted label positions and smaller font size
+ggplot(pca_df, aes(x = PC2, y = PC1, color = as.factor(Cluster), label = City)) +
+  geom_point() +  # Plot points
+  geom_text(vjust = -.5, hjust = .5, size = 3) +  # Add city names closer to the point with smaller font size
+  scale_color_manual(values = rainbow(length(unique(pca_df$Cluster)))) +  # Color by cluster using rainbow colors
+  labs(title = "PCA of Health Data by City", 
+       x = "Principal Component 2", 
+       y = "Principal Component 1", 
+       color = "Cluster") +  # Labels
+  theme_minimal() +  # Use a minimal theme
+  theme(legend.position = "right")  # Position the legend on the right
+
+```
+
+Now I will complete the same process for k = 4
+```{r}
+
+# Load necessary libraries
+library(ggplot2)
+
+# Assume pca_health contains PCA results, and 'df' is your DataFrame with city and cluster
+# Let's create a new data frame that includes PCA results and the cluster information
+# Extract the first two principal components
+pca_df <- data.frame(PC1 = pca_health$x[,1], PC2 = pca_health$x[,2])
+df = read.csv("K_means_Cluster_4.csv")
+df$City = df[,2]
+df$Cluster = df[,1]
+# Add city and cluster information assuming 'df' has columns 'City' and 'Cluster'
+pca_df$City <- df$City
+pca_df$Cluster <- df$Cluster
+
+# Create the plot
+# Create the plot with adjusted label positions and smaller font size
+ggplot(pca_df, aes(x = PC2, y = PC1, color = as.factor(Cluster), label = City)) +
+  geom_point() +  # Plot points
+  geom_text(vjust = -.5, hjust = .5, size = 3) +  # Add city names closer to the point with smaller font size
+  scale_color_manual(values = rainbow(length(unique(pca_df$Cluster)))) +  # Color by cluster using rainbow colors
+  labs(title = "PCA of Health Data by City", 
+       x = "Principal Component 2", 
+       y = "Principal Component 1", 
+       color = "Cluster") +  # Labels
+  theme_minimal() +  # Use a minimal theme
+  theme(legend.position = "right")  # Position the legend on the right
+
 
 ```
 
