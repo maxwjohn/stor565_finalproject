@@ -76,9 +76,6 @@ summary(pca_result)
 plot(pca_result$x[,1], pca_result$x[,2])
 pca.var <- pca_result$sdev^2
 
-# Check the standard deviations of the principal components
-std_dev <- pca_result$sdev
-
 # percantage of variation that each PCA accounts for
 pca.var.per <- round(pca.var/sum(pca.var)*100, 1)
 barplot(pca.var.per, main="Scree Plot", xlab="Principal Component", ylab="Percent Variation")
@@ -170,6 +167,37 @@ cluster_order <- cutree(hc_result, k = 3)
 heatmap(pca_scores[order(cluster_order), ], scale = "row", 
         Rowv = NA, Colv = NA, col = heat.colors(256),
         main = "Clustered Samples Heatmap")
+
+```
+
+
+```{r}
+library(cluster)
+
+# Defining a vector of distance measures to test
+distance_measures <- c("euclidean", "maximum", "manhattan", "canberra", "binary", "minkowski", "pearson", "spearman", "kendall")
+
+# Performing HC with different distance measures
+results <- lapply(distance_measures, function(dist_measure) {
+  if (dist_measure %in% c("pearson", "spearman", "kendall")) {
+    # Computing correlation matrix
+    cor_matrix <- cor(pca_scores, method = dist_measure)
+    # Converting correlation matrix to dissimilarity matrix
+    diss_matrix <- as.dist(1 - cor_matrix)
+  } else {
+    # For other distance measures, use dist function directly
+    diss_matrix <- dist(pca_scores, method = dist_measure)
+  }
+  # Performing hc
+  hc_result <- hclust(diss_matrix, method = "complete")
+  return(list(distance_measure = dist_measure, dendrogram = hc_result))
+})
+
+# Printing and comparing the results
+par(mfrow = c(3, 3))  #  plots in a grid
+for (res in results) {
+  plot(res$dendrogram, main = paste("Hierarchical Clustering with", res$distance_measure, "distance"))
+}
 
 ```
 
