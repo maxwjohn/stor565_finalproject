@@ -1,0 +1,326 @@
+---
+title: "data transformation"
+author: "Max"
+date: "2024-03-06"
+output: html_document
+---
+
+```{r}
+clusters = cluster_labels
+clusters$cities = rownames(clusters)
+cities_w_clusters = cities_clean %>% left_join(clusters, by = join_by("geo_label_city" == "cities"))
+```
+
+```{r}
+# Assuming the data is tab-separated
+happy <- read_csv("data/happiest_places_to_live.csv")
+happy <- happy %>% filter(!is.na(City))
+head(happy)
+## Edit names to make them equal
+happy <- happy %>%
+  mutate(City = ifelse(City == "Detroit, MI", "Detroit", City)) %>% 
+  mutate(City = ifelse(City == "Washington, DC", "Washington", City)) %>% 
+  mutate(City = ifelse(City == "New York", "New York City", City))
+```
+
+```{r}
+## Join 
+final = cities_w_clusters %>% left_join(happy, by = join_by(geo_label_city == City))
+response_cols = final %>% select(any_of(colnames(happy)))
+colnames(response_cols)
+```
+## Compare rankings to clusters
+
+```{r}
+rankings = final %>% select(ends_with("Rank"), ends_with("Score"), geo_label_city, Cluster)
+```
+
+
+```{r}
+df_averages <- rankings %>%
+  group_by(Cluster) %>%
+  summarise(
+    avg_Rank = mean(`Overall Rank`, na.rm = TRUE),
+    avg_wellbeing = mean(`Emotional and Physical Well-being Rank`, na.rm = TRUE),
+    avg_finance = mean(`Income and Employment Rank`, na.rm = TRUE),
+    avg_env= mean(`Community and Environment Rank`, na.rm = TRUE),
+    avg_Score = mean(`Total Score`, na.rm = TRUE)
+  )
+
+# View the results
+print(df_averages)
+#correlate(df_averages %>% select(!Cluster))
+```
+```{r}
+df_long <- rankings %>%
+  pivot_longer(cols = ends_with("Rank"), names_to = "ranking", values_to = "value")
+```
+
+```{r}
+ggplot(df_long, aes(x = Cluster, y = value, fill = ranking)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(title = "Ranking Distribution by Cluster", x = "Cluster", y = "Ranking")
+```
+
+```{r}
+ggplot(df_long, aes(x = Cluster, y = value, fill = ranking)) +
+  geom_violin() +
+  theme_bw() +
+  labs(title = "Ranking Distribution by Cluster", x = "Cluster", y = "Ranking")
+```
+
+```{r}
+df_summary <- df_long %>%
+  group_by(Cluster, ranking) %>%
+  summarize(mean_value = mean(value, na.rm = TRUE))
+
+ggplot(df_summary, aes(x = Cluster, y = mean_value, fill = ranking)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_bw() +
+  labs(title = "Average Ranking by Cluster", x = "Cluster", y = "Average Ranking")
+```
+
+```{r}
+ggplot(df_long, aes(x = Cluster, y = value, color = ranking)) +
+  geom_point(position = position_jitterdodge()) +
+  theme_bw() +
+  labs(title = "Rankings by Cluster", x = "Cluster", y = "Ranking")
+```
+https://www.census.gov/data/tables/time-series/demo/popest/2020s-total-metro-and-micro-statistical-areas.html
+
+## View Total Rank
+```{r}
+View(pca_scores)
+View(abs(pca_result$rotation))
+```
+
+
+## Initial Model: Train Ranking on PC scores
+
+```{r}
+## Step 1: Predict 
+rownames(pca_scores)
+pca_df = as_tibble(pca_scores)
+pca_df$cities = rownames(pca_scores)
+pca_wrank = pca_df %>% left_join(happy, by = join_by(cities == City))
+correlate(pca_wrank %>% select(starts_with("PC"), ends_with('Rank')))
+#View(final)
+```
+
+```{r, echo = TRUE}
+#First, set a grid of lambda to search over. We want to include lambda = 0 for standard linear regression
+grid.lambda <- 10^seq(10, -2, length = 100)
+
+#Fit the model across the grid of lambda values
+ridge.model <- glmnet(x, y, alpha = 0, lambda = grid.lambda)
+
+#Plot the L1 norm of the coefficents
+plot(ridge.model)
+```
+
+Associated with each value of $\lambda$, we have coefficient estimates that can be viewed using the *coef()* function. As there are 100 values of $\lambda$ and 20 coefficients, the coefficents are given in a $20 \times 100$ table. We look at an example of the coefficients and then calculate their $\ell_2$ norm. We then do this across all lambda and plot the $\ell_2$ norm at each value.
+
+```{r, echo = TRUE}
+# With each value of $\lambda$ --> we have coefficient estimates in coef()
+# Look at coef, plot l2 norm,  across all lambda and plot l2 norm at each value.
+#Look at the 50th value of lambda
+ridge.model$lambda[50]
+
+#Coefficients for this value 
+coef(ridge.model)[, 50]
+
+#Norm of these variables
+sqrt(sum(coef(ridge.model)[-1, 50]^2))
+
+#Let's repeat this for all lambda values and plot the results
+ell2.norm <- numeric()
+for(i in 1:length(grid.lambda)){
+  ell2.norm[i] <- sqrt(sum(coef(ridge.model)[-1, i]^2))
+}
+
+plot(x = grid.lambda, y = ell2.norm, xlab = expression(lambda), ylab = "L2 Norm", xlim = c(10,10000))
+```
+
+**Cross-Validation and Choosing the *best* tuning parameter**
+
+Using cross validation, we will now choose an optimal tuning parameter, using *cv.glmnet()*. default k = 10, can adjust with *nfolds*.
+
+```{r, echo = TRUE}
+set.seed(1) #for reproducability
+#Randomly select a training and test set.
+#Here, we leave half of the data out for later model assessment
+train <- sample(1:nrow(x), nrow(x) / 2)
+test <- (-train)
+y.train <- y[train]
+y.test <- y[test]
+
+#Now, fit a Ridge regression model to the training data
+ridge.model.train <- glmnet(x[train, ], y.train, alpha = 0, lambda = grid.lambda)
+
+#Let's perform cross validation to choose the best model
+?cv.glmnet
+
+#Perform cross validation on the training set to select the best lambda
+set.seed(1) #for reproducability
+cv.out <- cv.glmnet(x[train, ], y.train, alpha = 0)
+plot(cv.out)
+
+#Find the best lambda value
+best.lambda <- cv.out$lambda.min
+best.lambda
+plot(cv.out)
+abline(v = log(best.lambda), col = "blue", lwd = 2)
+
+#Calculate the MSPE of the model on the test set
+ridge.pred <- predict(ridge.model.train, s = best.lambda, newx = x[test, ])
+mspe.ridge <- mean((ridge.pred - y.test)^2)
+mspe.ridge
+
+#Fit the final model to the entire data set using the chosen lambda
+final.model <- glmnet(x, y, alpha = 0, lambda = best.lambda)
+Coef.Ridge <- coef(final.model)[1:20, ]
+Coef.Ridge
+```
+
+```{r}
+
+set.seed(1)
+train <- sample(36, 6)
+
+#Fit a tree on the training data
+tree.boston <- tree(medv ~ ., data = Boston, subset = train) # build
+summary(tree.boston)
+
+#Visualize the tree
+plot(tree.boston)
+text(tree.boston, pretty = 0)
+```
+
+
+## Second Model:
+Train on population change
+
+```{r}
+pop_change = read.csv("pop_change.csv")
+#View(pop_change)
+cities_list = cities_clean$geo_label_city
+
+find_all_matching_cities <- function(metro_description, cities) {
+  matched_cities <- cities[str_detect(metro_description, cities)]
+  if (length(matched_cities) == 0) {
+    return(NA)  # Return NA if no match is found
+  }
+  return(matched_cities)
+}
+
+# Applying the function to each metro_area and creating a list column
+pop_change$matched_cities <- map(pop_change$Metro.Area, find_all_matching_cities, cities = cities_list)
+
+# Expanding the data frame so that each city gets its own row
+data_expanded <- pop_change %>%
+  unnest(matched_cities) %>%
+  rename(major_city = matched_cities)
+
+# Replace NA with a placeholder if you want
+data_expanded$major_city[is.na(data_expanded$major_city)] <- "No Major City Matched"
+data_expanded$major_city[str_detect(data_expanded$Metro.Area, "New York")] = "New York City"
+## A number were false matches: Drop these
+drop_indices = c(67, 83, 89, 118, 141, 169)
+data_expanded = data_expanded[-drop_indices, ]
+data_pop = data_expanded %>% filter(major_city != "No Major City Matched") %>%  select(!Metro.Area)
+data_pop
+```
+
+```{r}
+data_pop =  data_pop %>%
+  mutate(across(c(X2023, X2022, X2021, X2020), ~as.numeric(gsub(",", "", .))))
+  #mutate(across(.cols = starts_with("X"), .fns = as.numeric))
+data_pop$one_yr_change = (data_pop$X2023 - data_pop$X2022) / data_pop$X2022
+data_pop$three_yr_change = (data_pop$X2023 - data_pop$X2020) / data_pop$X2020
+data_pop$avg_change = (((data_pop$X2023 - data_pop$X2022) / data_pop$X2022) + ((data_pop$X2022 - data_pop$X2021) / data_pop$X2021) + ((data_pop$X2021 - data_pop$X2020) / data_pop$X2020)) / 3
+```
+
+
+
+```{r, echo = TRUE}
+#First, set a grid of lambda to search over. We want to include lambda = 0 for standard linear regression
+grid.lambda <- 10^seq(10, -2, length = 100)
+
+#Fit the model across the grid of lambda values
+ridge.model <- glmnet(x, y, alpha = 0, lambda = grid.lambda)
+
+#Plot the L1 norm of the coefficents
+plot(ridge.model)
+```
+
+Associated with each value of $\lambda$, we have coefficient estimates that can be viewed using the *coef()* function. As there are 100 values of $\lambda$ and 20 coefficients, the coefficents are given in a $20 \times 100$ table. We look at an example of the coefficients and then calculate their $\ell_2$ norm. We then do this across all lambda and plot the $\ell_2$ norm at each value.
+
+```{r, echo = TRUE}
+# With each value of $\lambda$ --> we have coefficient estimates in coef()
+# Look at coef, plot l2 norm,  across all lambda and plot l2 norm at each value.
+#Look at the 50th value of lambda
+ridge.model$lambda[50]
+
+#Coefficients for this value 
+coef(ridge.model)[, 50]
+
+#Norm of these variables
+sqrt(sum(coef(ridge.model)[-1, 50]^2))
+
+#Let's repeat this for all lambda values and plot the results
+ell2.norm <- numeric()
+for(i in 1:length(grid.lambda)){
+  ell2.norm[i] <- sqrt(sum(coef(ridge.model)[-1, i]^2))
+}
+
+plot(x = grid.lambda, y = ell2.norm, xlab = expression(lambda), ylab = "L2 Norm", xlim = c(10,10000))
+```
+
+**Cross-Validation and Choosing the *best* tuning parameter**
+
+Using cross validation, we will now choose an optimal tuning parameter, using *cv.glmnet()*. default k = 10, can adjust with *nfolds*.
+
+```{r, echo = TRUE}
+set.seed(1) #for reproducability
+#Randomly select a training and test set.
+#Here, we leave half of the data out for later model assessment
+train <- sample(1:nrow(x), nrow(x) / 2)
+test <- (-train)
+y.train <- y[train]
+y.test <- y[test]
+
+#Now, fit a Ridge regression model to the training data
+ridge.model.train <- glmnet(x[train, ], y.train, alpha = 0, lambda = grid.lambda)
+
+#Let's perform cross validation to choose the best model
+?cv.glmnet
+
+#Perform cross validation on the training set to select the best lambda
+set.seed(1) #for reproducability
+cv.out <- cv.glmnet(x[train, ], y.train, alpha = 0)
+plot(cv.out)
+
+#Find the best lambda value
+best.lambda <- cv.out$lambda.min
+best.lambda
+plot(cv.out)
+abline(v = log(best.lambda), col = "blue", lwd = 2)
+
+#Calculate the MSPE of the model on the test set
+ridge.pred <- predict(ridge.model.train, s = best.lambda, newx = x[test, ])
+mspe.ridge <- mean((ridge.pred - y.test)^2)
+mspe.ridge
+
+#Fit the final model to the entire data set using the chosen lambda
+final.model <- glmnet(x, y, alpha = 0, lambda = best.lambda)
+Coef.Ridge <- coef(final.model)[1:20, ]
+Coef.Ridge
+```
+
+
+```{r}
+## Mutate: pull first -,
+## 
+```
+

@@ -1,0 +1,298 @@
+---
+title: "03-indexing"
+author: "Max"
+date: "2024-04-21"
+output: html_document
+---
+
+## initial indexing of column names
+
+```{r}
+columnnames = colnames(cities_clean %>% select(!c(geo_label_city, geo_fips_code, date_label)))
+columnnames
+df_ctgy_health = list(
+  tibble(ctgy = "health", sub_ctgy = "deaths", 
+         col = columnnames[str_detect(columnnames, "Death|Suicide") & !str_detect(columnnames, "HIV|Diabetes") ]),
+  tibble(ctgy = "health", sub_ctgy = "births", 
+         col = columnnames[str_detect(columnnames, "Birth")]),
+  tibble(ctgy = "health", sub_ctgy = "vaccinations", 
+         col = columnnames[str_detect(columnnames, "Vaccination")]),
+  tibble(ctgy = "health", sub_ctgy = "medicalcare", 
+         col = columnnames[str_detect(columnnames, "Care|Uninsured")]),
+  tibble(ctgy = "health", sub_ctgy = "stds", 
+         col = columnnames[str_detect(columnnames, "HIV|Syphilis|Chlamydia|Gonorrhea")]),
+  tibble(ctgy = "health", sub_ctgy = "conditions/disease", 
+         col = columnnames[str_detect(columnnames, "Disabilities|Diab|Blood|Tuber|Obesity|Mental")]),
+    tibble(ctgy = "health", sub_ctgy = "other_health", 
+         col = columnnames[str_detect(columnnames, "Inactivity|Smok|Drink|Expect")])
+) %>% bind_rows()
+leftover = columnnames %>% setdiff(df_ctgy_health %>% pull(col))
+df_ctgy_income = list(
+  tibble(ctgy = "Income", sub_ctgy = "poverty", 
+         col = leftover[str_detect(leftover, "Poverty|Unempl|Service")]),
+  tibble(ctgy = "Income", sub_ctgy = "inc_level", 
+         col = leftover[str_detect(leftover, "Inequ|Per-cap|Higher-Inc")])
+  ) %>% bind_rows()
+leftover = leftover %>% setdiff(df_ctgy_income %>% pull(col))
+df_ctgy_transp =  list(
+  tibble(ctgy = "transportation", sub_ctgy = "public", 
+         col = leftover[str_detect(leftover, "Bike|Walk|Public")]),
+    tibble(ctgy = "transportation", sub_ctgy = "drive", 
+         col = leftover[str_detect(leftover, "Car|Driv")])
+  
+  ) %>% bind_rows()
+leftover = leftover %>% setdiff(df_ctgy_transp %>% pull(col))
+df_ctgy_hous = list(
+  tibble(ctgy = "housing", sub_ctgy = "quality", 
+         col = leftover[str_detect(leftover, "Lead")]),
+    tibble(ctgy = "housing", sub_ctgy = "ownership", 
+         col = leftover[str_detect(leftover, "Units|Owner")]),
+  tibble(ctgy = "housing", sub_ctgy = "homeless", 
+         col = leftover[str_detect(leftover, "Homelessness")]),
+  tibble(ctgy = "housing", sub_ctgy = "cost", 
+         col = leftover[str_detect(leftover, "Cost")])
+  ) %>% bind_rows()
+leftover = leftover %>% setdiff(df_ctgy_hous %>% pull(col))
+df_ctgy_demog_life  = list(
+  tibble(ctgy = "demography", sub_ctgy = "low-inc", 
+         col = leftover[str_detect(leftover, "Children|Single-Parent|inority|Foreign|Spanish")]),
+    tibble(ctgy = "demography", sub_ctgy = "hi-inc", 
+         col = leftover[str_detect(leftover, "Grad|Seniors|Chinese|English")]),
+  tibble(ctgy = "demography", sub_ctgy = "segreg", 
+         col = leftover[str_detect(leftover, "Segregation")]),
+    tibble(ctgy = "demography", sub_ctgy = "safety", 
+         col = leftover[str_detect(leftover, "Air Quality|Violent|Killings|Homicides")]),
+    tibble(ctgy = "demography", sub_ctgy = "other", 
+         col = leftover[str_detect(leftover, "Preschool|Supermarket|Density")])
+  ) %>% bind_rows()
+leftover = leftover %>% setdiff(df_ctgy_demog_life %>% pull(col))
+leftover
+```
+```{r}
+df_cat = df_ctgy_health %>% 
+  rbind(df_ctgy_demog_life) %>% 
+  rbind(df_ctgy_hous) %>% 
+  rbind(df_ctgy_income) %>% 
+  rbind(df_ctgy_transp)
+```
+
+
+## Hierarchical clustering on columns
+```{r}
+scaled = scale(cities_clean %>% select(!c(geo_label_city, geo_fips_code, date_label)))
+df_t <- t(scaled)
+
+# Calculate the distance matrix using Euclidean distance (you can choose another method)
+dist_matrix <- dist(df_t, method = "euclidean")
+
+# Perform hierarchical clustering
+hc_columns <- hclust(dist_matrix, method = "complete") # You can choose another linkage method
+
+# Plot the dendrogram
+plot(hc_columns, main = "Dendrogram of Columns", xlab = "Columns", sub = "", ylab = "Height")
+```
+#### Checking optimal clusters for variables
+```{r}
+sil_width <- vector("numeric", length = 14) # Adjust the length for the number of clusters to inspect minus one
+for (k in 2:15) { # Starts from 2 because silhouette doesn't work with a single cluster
+  cluster_assignments <- cutree(hc_columns, k)
+  silhouette_analysis <- silhouette(cluster_assignments, dist_matrix)
+  sil_width[k-1] <- mean(silhouette_analysis[, 3]) # Average silhouette width
+}
+
+# Plot the average silhouette width
+plot(2:15, sil_width, type = "b", xlab = "Number of Clusters", ylab = "Average Silhouette Width", main = "Silhouette Method for Optimal Clusters")
+```
+
+```{r}
+varclusters <- cutree(hc_columns, k = 6)
+
+# If you want to see which columns are in each cluster
+
+df_varclusters <- data.frame(df_t, Cluster = as.factor(varclusters)) %>% select(Cluster)
+#dend <- as.dendrogram(hc_columns) # Visualizing dendrogram with actual column names
+#labels(dend) <- rownames(numeric_data) # Adding names as labels
+#plot(hc_columns, main = "Dendrogram of Columns", xlab = "Columns", sub = "", ylab = "Height")
+df_varclusters
+```
+
+
+# Hierarchical clustering on columns
+```{r}
+df_tred <- t(scaled_red)
+
+# Calculate the distance matrix using Euclidean distance (you can choose another method)
+dist_red_matrix <- dist(df_tred, method = "euclidean")
+
+# Perform hierarchical clustering
+hc_redcolumns <- hclust(dist_red_matrix, method = "complete") # You can choose another linkage method
+
+# Plot the dendrogram
+plot(hc_redcolumns, main = "Dendrogram of Columns", xlab = "Columns", sub = "", ylab = "Height")
+
+varclusters_red <- cutree(hc_redcolumns, k = 3)
+
+# If you want to see which columns are in each cluster
+
+df_redvarclusters <- data.frame(df_tred, Cluster = as.factor(varclusters_red)) %>% select(Cluster)
+```
+
+
+```{r}
+df_display = df_varclusters %>% mutate(col = rownames(df_varclusters)) %>% left_join(df_cat, by = "col")
+df_reddisplay = df_redvarclusters %>% mutate(col = rownames(df_redvarclusters)) %>% left_join(df_cat, by = "col")
+
+#View(df_redvarclusters)
+#View(df_varclusters)
+
+for (i in 1:6){
+print(plot_sankey(df_display %>% filter(Cluster == i), from_to = c("col", "ctgy", "Cluster", "sub_ctgy")))
+}
+```
+
+```{r}
+for (i in 1:3){
+print(plot_sankey(df_reddisplay %>% filter(Cluster == i), from_to = c("col", "ctgy", "Cluster", "sub_ctgy")))
+}
+```
+
+
+
+```{r}
+library(igraph)
+library(networkD3)
+plot_sankey <- function(df, from_to, count_fn = "n", fn_col = NULL, ...)
+{
+  count_fn <- match.arg(count_fn, c("n", "n_distinct", "sum"), several.ok = FALSE)
+  from_to_ls <- lapply(1:(length(from_to)-1L), function(x) {
+    setNames(from_to[x:(x+1L)], c("from", "to"))
+  })
+  the_dots <- list(...)
+  dat_ls <- lapply(from_to_ls, function(x){
+    dat <- df %>%  dplyr::mutate(dplyr::across(dplyr::all_of(unname(x)),
+                  function(y){
+                    paste(dplyr::cur_column(), y, sep = ": ")
+                  })) %>% dplyr::rename(dplyr::all_of(x)) %>% dplyr::group_by(from, to)
+  if (count_fn == "n"){
+    dat <- dat %>% summarise(n = n(), .groups = "drop")
+  }
+  else {
+    dat <- dat %>% dplyr::summarise(dplyr::across(dplyr::all_of(fn_col),
+                                                  function(y) {
+                                                    do.call(count_fn, append(list(y), the_dots))
+                                                  }, .names = "n"), .groups = "drop")}
+    dat})
+    dat_ls <- dat_ls[sapply(dat_ls, inherits, "data.frame")]
+    dat <- do.call(rbind, dat_ls)
+    graph_from_df <- igraph::graph_from_data_frame(dat)
+    g_d3 <- networkD3::igraph_to_networkD3(graph_from_df)
+    networkD3::sankeyNetwork(Links = g_d3$links, Nodes = g_d3$nodes, Source = "source", Target = "target", Value = "value", NodeID = "name", fontSize = 11, margin = c(top = 100, bottom= 100), sinksRight = FALSE)
+}
+```
+
+```{r}
+plot_sankey(df_cat, from_to = c("ctgy", "sub_ctgy", "col"))
+```
+
+
+## Build Scoring System
+```{r}
+## Cluster name
+df_display = df_display %>%  mutate(Cluster = case_when(
+    Cluster == 1 ~ "health_poverty_index",
+    Cluster == 2 ~ "income_eq_educ_index",
+    Cluster == 3 ~ "safety_index",
+    Cluster == 4 ~ "suburb_sprawl_index",
+    Cluster == 5 ~ "bigcity_segregat_index",
+    Cluster == 6 ~ "std_drug_index",
+    TRUE ~ as.character(Cluster)  # Fallback, in case there are other unexpected values
+  ))
+df_display
+```
+## Building indexes
+
+```{r}
+clusters_list <- split(df_display$col, df_display$Cluster)
+# Initialize an empty dataframe to store the final results
+final_df <- cities_clean %>% select(-c("geo_fips_code", "date_label"))
+
+# Loop through each cluster
+for(cluster in names(clusters_list)) {
+  # Subset values_df for the current cluster's variables
+  subset_df <- cities_clean %>%
+    select(geo_label_city, all_of(clusters_list[[cluster]]))
+  
+  # Calculate the average for each city in this cluster
+  averages_df <- subset_df %>%
+    group_by(geo_label_city) %>%
+    summarise(!!paste0("Cluster", cluster) := mean(across(-geo_label_city), na.rm = TRUE), .groups = 'drop')
+  
+  # Merge the averages back into the final_df
+  final_df <- left_join(final_df, averages_df, by = "geo_label_city")
+}
+
+# View the final dataframe
+print(final_df)
+averages_df <- subset_df %>%
+  group_by(geo_label_city) %>%
+  summarise(
+    !!paste0("Cluster", cluster) := mean(across(where(is.numeric)), na.rm = TRUE),
+    .groups = 'drop'
+  )
+averages_df
+averages_df <- subset_df %>%
+  group_by(geo_label_city) %>%
+  summarise(across(-geo_label_city, mean, na.rm = TRUE), .groups = 'drop')
+
+```
+
+
+```{r}
+
+numeric_columns <- select_if(cities_clean, is.numeric)
+categorical_columns <- select_if(cities_clean, Negate(is.numeric))
+
+# Scale numeric columns
+scaled_numeric_columns <- scale(numeric_columns)
+
+# Combine scaled numeric with categorical columns
+df_scaled <- bind_cols(as.data.frame(scaled_numeric_columns), categorical_columns)
+
+# Convert df_values to long format
+#df_clusters_long <- pivot_longer(df_clusters, cols = -city, names_to = "variable", values_to = "cluster")
+df_values_long <- pivot_longer(df_scaled, cols = -city, names_to = "variable", values_to = "value")
+```
+
+Scale between 0-1 with percent rank
+```{r}
+View(c)
+final_long = final_df %>% pivot_longer(!geo_label_city, names_to = "var", values_to = "value")
+final_long = final_long %>% left_join(
+  df_display %>% select(Cluster, col),
+  by = join_by("var" == "col")
+) 
+final_idx = final_long %>% mutate(
+  ptile = percent_rank(value),
+  ptile = dplyr::case_when(ptile < (1 - max(ptile, na.rm = TRUE)) ~ (1 - max(ptile, na.rm = TRUE)), .default = ptile),
+  .by = var
+) %>% 
+  summarise(
+    idx_value = mean(ptile, na.rm = TRUE),
+    .by = c(Cluster, geo_label_city)
+  ) %>% 
+  pivot_wider(id_cols = geo_label_city, names_from = Cluster, values_from = idx_value)
+
+```
+
+```{r}
+df_cityclusters = df_clusters_joined %>% select(Cities, Cluster.x, Cluster.y)
+complete = final_idx %>% left_join(df_cityclusters, by = join_by("geo_label_city" == "Cities"))
+complete
+```
+
+```{r}
+idx_names = colnames(complete)[endsWith(colnames(complete), "index")]
+complete %>% group_by(Cluster.x) %>% summarise(across(.cols = idx_names, median, na.rm = TRUE ))
+correlate(complete %>% select(ends_with("index")))
+```
+

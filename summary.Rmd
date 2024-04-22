@@ -5,7 +5,13 @@ date: "2024-04-13"
 output: html_document
 ---
 
+
+## Goal: How can We Quantify the quality of a city: 
 ## Initial dataframe imported/edited (widened)
+```{r}
+
+```
+
 
 Initial dataframe has thousands of rows which are the metrics, and each row corresponds to a different group. 
 Unsupervised setting, this is a domain understanding project. There is no prediction, we are mostly trying to create our own grade/grouping of major US cities. This is subjective though, there is no specific rating, so we are going to attempt to do this ourselves. 
@@ -59,7 +65,14 @@ View(categories)
 
 
 ## Prediction of quality of cities:
-  1) groupings: nonlinear
+  1) groupings: nonlinear:
+  - 
+  
   2) indexes--> PC or through 
+  
+
+## Using the predictions of the quality of cities:
+  1) Compare to one we got off internet
+  2) See how this impacts movement to and from a city
 
 

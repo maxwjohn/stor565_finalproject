@@ -1,0 +1,137 @@
+---
+title: "data transformation"
+author: "Max"
+date: "2024-03-06"
+output: html_document
+---
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+#setwd("/Users/nicolaibogh/Library/CloudStorage/OneDrive-KøbenhavnsUniversitet/Kandidat/UNC/STOR565 MACHINE LEARNING/StorGitHub/stor565MLproject")
+# data <- read_csv("bigcitiesall.csv")
+# total = data %>% filter(geo_label_citystate == "U.S. Total")
+```
+
+
+
+```{r}
+#Clean data code (data defined as latest_filtered)
+#Taking out na values and only using 2021
+cities <- read_csv("data/bigcities_wide.csv")
+us_total = cities %>% filter(geo_label_city == "U.S. Total")
+
+
+#### From Max' cleaning
+#imp = cities %>% select(metric_item_label, geo_label_city, geo_fips_code, value,date_label)
+#wide = imp %>% pivot_wider( names_from = metric_item_label, values_from = value)
+## Write csv
+# write.csv(wide, file = "/Users/nicolaibogh/Library/CloudStorage/OneDrive-KøbenhavnsUniversitet/Kandidat/UNC/STOR565 MACHINE LEARNING/StorGitHub/stor565MLproject/bigcities_wide.csv", row.names = FALSE)
+
+
+
+cities = read_csv("data/bigcities_wide.csv")
+us_total = cities %>% filter(geo_label_city == "U.S. Total")
+## Work with 2021 or 2020 data
+new_cities = cities %>% filter(date_label == 2021)
+na_count = colSums(is.na(new_cities)) / nrow(new_cities)
+lowna = na_count[colSums(is.na(new_cities)) / nrow(new_cities) < .33]
+lowna_cols = names(lowna)
+cities_nona = new_cities %>% select(all_of(lowna_cols))
+## Impute as dataframe
+cities_clean <- cities_nona %>%
+  mutate(across(where(is.numeric), ~ifelse(is.na(.), median(., na.rm = TRUE), .))) %>% 
+  filter(geo_label_city != "U.S. Total")
+
+
+numeric_data <- cities_clean %>% filter(geo_label_city != "U.S. Total") %>% select(!c("geo_label_city", "geo_fips_code", "date_label")) # Exclude the first column containing city names
+rownames(numeric_data) = cities_clean$geo_label_city  # Transpose the numeric data
+# Set column names to city names
+#colnames(transposed_data) <- cities_clean$geo_label_city
+# Now transposed_data contains the numeric variables as rows and cities as columns
+
+### test 2
+#city_var <- numeric_data
+#rownames(city_var) <- cities_clean$geo_label_city
+
+# Removing "geo_fips_code" and "date_label"
+#transposed_data <- transposed_data[-c(1:2), ]
+```
+
+Do we want to keep just 2020 and later data? for now, no
+```{r, eval=FALSE}
+data_2020 = data %>% filter(date_label != 2010)
+na_count_2020 = colSums(is.na(data_2020)) / nrow(data_2020)
+length(na_count_2020[colSums(is.na(data_2020)) / nrow(data_2020) < .33])
+lowna = na_count[colSums(is.na(data)) / nrow(data) < .33]
+lowna_cols = names(lowna)
+```
+
+## Exploratory Data Analysis
+
+Our goal is to see what we can predict given the quality of a city. To start, we will build a model attempting to give a "rating" of a city, comparing this to another source's list on what are the best cities. 
+
+The first step is going to be choosing suitable variables.
+
+The initial data analysis gave us about 
+
+```{r}
+#colnames(num_cols) # These are the variables
+## label columns are geo_label_city, geo_fips_code
+## Numerical columns
+num_cols = cities_clean %>% select(!c(geo_label_city, geo_fips_code, date_label))## 88 columns
+par(mfrow=c(3,3), mar=c(4,4,2,0.5))
+# Iterate over numeric columns and plot histograms
+for (j in seq_along(num_cols)) {
+  hist(num_cols[[j]], 
+       xlab=names(num_cols)[j],
+       main=paste("Histogram of", names(num_cols)[j]),
+       col="lightblue", breaks=20)
+}
+```
+
+The initial histogram shows a decent amount of variation in the variables. Because we have high dimension (p) and low sample size, this can lead to a lot of problems with dimensionality. To fix this, we are going to try to reduce multicollinearity by using correlation and domain understanding.
+
+Before this, we are going to do some initial clustering to see if there are any groupings that we could potentially use to reduce dimensions.
+
+
+
+Things we could potentially predict:
+
+- Consumer Price Index: https://fred.stlouisfed.org/series/CPIAUCSL
+- Home Price Index: https://fred.stlouisfed.org/series/SPCS20RSA
+- Meidcal Cost: https://fred.stlouisfed.org/series/CPIMEDSL
+- Walkability: https://catalog.data.gov/dataset/walkability-index1
+- Public School data: https://catalog.data.gov/dataset/public-school-characteristics-current-8d621
+- College Scorecards: https://catalog.data.gov/dataset/college-scorecard-c25e9
+- redlining: https://catalog.data.gov/dataset/redlining-maps-from-the-home-owners-loan-corporation-1937
+- Zip code: https://catalog.data.gov/dataset/places-local-data-for-better-health-zcta-data-2020-release-ea5f2
+- Places data: https://catalog.data.gov/dataset/places-local-data-for-better-health-county-data-2020-release-94305
+
+
+## Response Variable: 
+
+This section of our model will be attempting to predict the happiness of a city, from this source https://wallethub.com/edu/happiest-places-to-live/32619, using the data from our dataframe
+
+```{r}
+# Assuming the data is tab-separated
+happy <- read_csv("data/happiest_places_to_live.csv")
+happy <- happy %>% filter(!is.na(City))
+head(happy)
+## Edit names to make them equal
+happy <- happy %>%
+  mutate(City = ifelse(City == "Detroit, MI", "Detroit", City)) %>% 
+  mutate(City = ifelse(City == "Washington, DC", "Washington", City)) %>% 
+  mutate(City = ifelse(City == "New York", "New York City", City))
+```
+
+```{r}
+## Join 
+joined = cities_clean %>% left_join(happy, by = join_by(geo_label_city == City))
+response_cols = joined %>% select(any_of(colnames(happy)))
+colnames(response_cols)
+```
+
+
