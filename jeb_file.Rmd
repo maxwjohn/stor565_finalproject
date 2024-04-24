@@ -21,7 +21,7 @@ You can predict on any of the Rank variables: I would recommend doing `Emotional
 
 
 ```{r}
-read.csv(df_model_final, "model_final.csv")
+df_model_final = read.csv( "model_final.csv")
 df_model_final
 ```
 ## My attmempt at modeling: incomplete, change predictor 
@@ -30,9 +30,10 @@ Get lasso and ridge to work
 ## Final Model:
 Train model on indexes created
 ```{r}
-df_final = df_model_final %>% select(`Overall Rank` ,ends_with("index"))
-x = model.matrix(`Overall Rank` ~., data = df_final)[, -1]
-y = df_final$`Overall Rank`
+library(dplyr)
+df_final = df_model_final %>% select(`Overall.Rank` ,ends_with("index"))
+x = model.matrix(`Overall.Rank` ~., data = df_final)[, -1]
+y = df_final$`Overall.Rank`
 ```
 ```{r, echo = TRUE}
 library(glmnet)
@@ -83,6 +84,21 @@ mspe.ridge
 final.model <- glmnet(x, y, alpha = 0, lambda = best.lambda)
 Coef.Ridge <- coef(final.model)
 Coef.Ridge
+
+cv.out$lambda.min
+
+#Calculating R-Squared on the Predctions
+# Calculate R-squared on the test set
+rsq <- function(y, y_pred) {
+  1 - sum((y_pred - y)^2) / sum((y - mean(y))^2)
+}
+
+r_squared <- rsq(y.test, ridge.pred)
+cat("r_squared", r_squared, "\n")
+
+
+
+
 ```
 
 ```{r}
@@ -108,7 +124,112 @@ mspe.ridge
 final.model_lasso <- glmnet(x, y, alpha = 1, lambda = best.lambda_lasso)
 Coef.lasso <- coef(final.model_lasso)
 Coef.lasso
+
+
 ```
+
+
+
+#Now we can use ridge and Lasso to predict other ranks. Lets start with emotional and physical well being rank.
+
+```{r}
+colnames(df_model_final)
+library(dplyr)
+df_final = df_model_final %>% select(`Emotional.and.Physical.Well.being.Rank` ,ends_with("index"))
+x = model.matrix(`Emotional.and.Physical.Well.being.Rank` ~., data = df_final)[, -1]
+y = df_final$`Emotional.and.Physical.Well.being.Rank`
+```
+```{r, echo = TRUE}
+library(glmnet)
+#First, set a grid of lambda to search over. We want to include lambda = 0 for standard linear regression
+grid.lambda <- 10^seq(10, -2, length = 100)
+
+#Fit the model across the grid of lambda values
+ridge.model <- glmnet(x, y, alpha = 0, lambda = grid.lambda)
+
+#Plot the L1 norm of the coefficents
+plot(ridge.model)
+```
+
+```{r}
+set.seed(1) #for reproducability
+#Randomly select a training and test set.
+#Here, we leave half of the data out for later model assessment
+train <- sample(1:nrow(x), nrow(x) - 5)
+test <- (-train)
+y.train <- y[train]
+y.test <- y[test]
+x_train = x[train, ]
+x_test = x[test,]
+#Now, fit a Ridge regression model to the training data
+ridge.model.train <- glmnet(x_train, y.train, alpha = 0, lambda = grid.lambda)
+
+#Perform cross validation on the training set to select the best lambda
+set.seed(1) #for reproducability
+cv.out <- cv.glmnet(x[train, ], y.train, alpha = 0)
+plot(cv.out)
+
+#Find the best lambda value
+best.lambda <- cv.out$lambda.min
+best.lambda
+plot(cv.out)
+abline(v = log(best.lambda), col = "blue", lwd = 2)
+
+#Calculate the MSPE of the model on the test set
+ridge.pred <- predict(ridge.model.train, s = best.lambda, newx = x_test)
+mspe.ridge <- mean((ridge.pred - y.test)^2)
+mspe.ridge
+
+#Fit the final model to the entire data set using the chosen lambda
+final.model <- glmnet(x, y, alpha = 0, lambda = best.lambda)
+Coef.Ridge <- coef(final.model)
+Coef.Ridge
+
+
+```
+
+```{r}
+lasso.model.train <- glmnet(x_train, y.train, alpha = 1, lambda = grid.lambda)
+
+#Perform cross validation on the training set to select the best lambda
+set.seed(1) #for reproducability
+cv.out_lasso <- cv.glmnet(x_train, y.train, alpha = 1)
+plot(cv.out_lasso)
+
+#Find the best lambda value
+best.lambda_lasso <- cv.out_lasso$lambda.min
+best.lambda_lasso
+plot(cv.out_lasso)
+abline(v = log(best.lambda_lasso), col = "blue", lwd = 2)
+
+#Calculate the MSPE of the model on the test set
+lasso.pred <- predict(lasso.model.train, s = best.lambda_lasso, newx = x_test)
+mspe.lasso <- mean((lasso.pred - y.test)^2)
+mspe.ridge
+
+#Fit the final model to the entire data set using the chosen lambda
+final.model_lasso <- glmnet(x, y, alpha = 1, lambda = best.lambda_lasso)
+Coef.lasso <- coef(final.model_lasso)
+Coef.lasso
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ```{r}
