@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## R Markdown
 
-
+```{r}
 library(igraph)
 library(networkD3)
 plot_sankey <- function(df, from_to, count_fn = "n", fn_col = NULL, ...)
@@ -41,3 +41,756 @@ plot_sankey <- function(df, from_to, count_fn = "n", fn_col = NULL, ...)
   g_d3 <- networkD3::igraph_to_networkD3(graph_from_df)
   networkD3::sankeyNetwork(Links = g_d3$links, Nodes = g_d3$nodes, Source = "source", Target = "target", Value = "value", NodeID = "name", fontSize = 11, margin = c(top = 100, bottom= 100), sinksRight = FALSE)
 }
+```
+
+
+```{r} 
+library(dplyr)
+
+data[,1] = data$Clusters
+data[,2] = data$Cities
+data <- read.csv("K_means_Cluster_4.csv")
+# Ensure that your data has proper columns and if not, modify them or the following code
+# Here, assuming your data's first column is 'Cluster' and second column is 'City'
+#data <- data %>% rename(Clusters = V1, Cities = V2)
+
+plot_sankey(data, data, count_fn = "n")
+```
+
+```{r}
+#Restarting with Chat GPT's recomended method so I can visualize the plot and adjust form there
+data <- data %>% 
+  rename(Source = X.kmeans_result.cluster., Target = X.bigCities.geo_label_city.2.36..)
+
+# Creating a frequency table to use for the Sankey plot
+sankey_data <- data %>% 
+  count(Source, Target) %>%
+  mutate(Source = as.character(Source), Target = as.character(Target))
+
+# Creating the Sankey plot
+sankey_plot <- sankeyNetwork(Links = sankey_data, Nodes = data.frame(name=c(as.character(sankey_data$Source), as.character(sankey_data$Target)) %>% unique()),
+                             Source = "Source", Target = "Target", Value = "n", NodeID = "name", units = "Tally", fontSize = 12, nodeWidth = 30)
+
+# Print the Sankey plot to the viewer
+print(sankey_plot)
+
+```
+
+
+
+```{r}
+colnames(data)
+```
+
+```{r}
+#Chat GPT's fix for the previous method
+# Load required packages
+library(networkD3)
+library(dplyr)
+
+# Inspecting the initial data - check for any obvious issues
+print(head(data))
+
+# Assuming the dataframe 'data' has two columns; replace 'Column1' and 'Column2' with your actual column names
+#data <- data %>% 
+  #rename(Source = Column1, Target = Column2)
+
+# Inspecting data after renaming - check the structure
+print(head(data))
+
+# Create a frequency table to use for the Sankey plot
+sankey_data <- data %>% 
+  count(Source, Target) %>%
+  mutate(Source = as.character(Source), Target = as.character(Target))
+
+# Inspecting the sankey_data - check if the counts make sense
+print(head(sankey_data))
+
+# Ensure all nodes have unique names and check if there are any mismatch issues
+nodes <- data.frame(name = unique(c(sankey_data$Source, sankey_data$Target)))
+
+# Print nodes to ensure all expected nodes are present
+print(nodes)
+
+# Create the Sankey plot
+sankey_plot <- sankeyNetwork(
+  Links = sankey_data,
+  Nodes = nodes,
+  Source = which(names(nodes) == "name"),  # this should match the 'name' in Nodes
+  Target = which(names(nodes) == "name"),
+  Value = "n",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30
+)
+
+# Check if the sankey_plot object is created properly
+print(sankey_plot)
+
+# If the output is NULL, there might be an issue with data not matching up or being insufficient
+
+
+```
+
+
+
+
+```{r}
+#correction for the data structure
+
+# Load required packages
+library(networkD3)
+library(dplyr)
+
+# Load the data
+data <- read.csv("K_means_Cluster_4.csv")
+
+# Rename the columns for easier reference
+data <- data %>%
+  rename(Cluster = X.kmeans_result.cluster., City = X.bigCities.geo_label_city.2.36..)
+
+# Create a frequency table to use for the Sankey plot
+sankey_data <- data %>%
+  count(Cluster, City) %>%
+  mutate(Cluster = as.character(Cluster), City = as.character(City))
+
+# Prepare nodes and ensure they are unique
+nodes <- data.frame(name = unique(c(sankey_data$Cluster, sankey_data$City)))
+
+# Create the Sankey plot
+sankey_plot <- sankeyNetwork(
+  Links = sankey_data,
+  Nodes = nodes,
+  Source = which(names(nodes) == "name"),
+  Target = which(names(nodes) == "name"),
+  Value = "n",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30
+)
+
+# Print the Sankey plot to the viewer
+print(sankey_plot)
+
+
+
+
+```
+
+
+```{r}
+#opening as an html file
+# Load required packages
+library(networkD3)
+library(dplyr)
+
+# Load the data
+data <- read.csv("K_means_Cluster_3.csv")
+
+# Rename the columns for easier reference
+data <- data %>%
+  rename(Cluster = X.kmeans_result.cluster., City = X.bigCities.geo_label_city.2.36..)
+
+# Create a frequency table to use for the Sankey plot
+sankey_data <- data %>%
+  count(Cluster, City) %>%
+  mutate(Cluster = as.character(Cluster), City = as.character(City))
+
+# The 'sankeyNetwork' function expects the source and target to be numeric indices, not actual names
+# so we need to create a node list and then use their indices
+node_list <- unique(c(sankey_data$Cluster, sankey_data$City))
+
+# Create a Links dataframe with source and target as indices
+sankey_links <- sankey_data %>%
+  mutate(source = match(Cluster, node_list) - 1,
+         target = match(City, node_list) - 1)
+
+# Create Nodes dataframe with names
+sankey_nodes <- data.frame(name = node_list)
+
+# Create the Sankey plot
+sankey_plot <- sankeyNetwork(
+  Links = sankey_links,
+  Nodes = sankey_nodes,
+  Source = "source",
+  Target = "target",
+  Value = "n",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30
+)
+
+# Print the Sankey plot to the viewer
+print(sankey_plot)
+
+# Save the Sankey plot to an HTML file
+htmlwidgets::saveWidget(sankey_plot, "sankey_plot.html", selfcontained = TRUE)
+
+# Open the HTML file in your default web browser
+browseURL("sankey_plot.html")
+
+
+```
+
+
+
+```{r}
+#now importing Nicolai's data from hierarchical clustering 
+# Load required packages
+library(networkD3)
+library(dplyr)
+library(readr) # for read_csv, which handles data better than read.csv
+
+# Load the first set of clustering data
+data1 <- read.csv("K_means_Cluster_4.csv")
+data1 <- data1 %>%
+  rename(Cluster1 = X.kmeans_result.cluster., City = X.bigCities.geo_label_city.2.36..)
+
+# Load the second set of clustering data
+data2 <- read_csv("city_cluster_data - city_cluster_data.csv")
+data2 <- data2 %>%
+  rename(City = 1, Cluster2 = 2) %>%
+  mutate(City = as.character(City), Cluster2 = as.factor(Cluster2))
+
+# Combine both sets of data
+combined_data <- full_join(data1, data2, by = "City")
+
+# Create a frequency table for the first set of clusters
+sankey_data1 <- combined_data %>%
+  count(Cluster1, City) %>%
+  mutate(Cluster1 = paste("Cluster1", Cluster1, sep = "-"), 
+         City = as.character(City))
+
+# Create a frequency table for the second set of clusters
+sankey_data2 <- combined_data %>%
+  count(City, Cluster2) %>%
+  mutate(City = as.character(City), 
+         Cluster2 = paste("Cluster2", Cluster2, sep = "-"))
+
+# Combine both frequency tables
+sankey_data <- bind_rows(sankey_data1, sankey_data2) %>%
+  rename(Source = 1, Target = 2, Value = n)
+
+# The 'sankeyNetwork' function expects the source and target to be numeric indices, not actual names
+node_list <- unique(c(sankey_data$Source, sankey_data$Target))
+
+# Create a Links dataframe with source and target as indices
+sankey_links <- sankey_data %>%
+  mutate(source = match(Source, node_list) - 1,
+         target = match(Target, node_list) - 1)
+
+# Create Nodes dataframe with names
+sankey_nodes <- data.frame(name = node_list)
+
+# Create the Sankey plot
+sankey_plot <- sankeyNetwork(
+  Links = sankey_links,
+  Nodes = sankey_nodes,
+  Source = "source",
+  Target = "target",
+  Value = "Value",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30,
+  sinksRight = FALSE # This makes non-terminal nodes flow to the left
+)
+
+# Print the Sankey plot to the viewer
+print(sankey_plot)
+
+# Save the Sankey plot to an HTML file
+htmlwidgets::saveWidget(sankey_plot, "sankey_plot.html", selfcontained = TRUE)
+
+# Open the HTML file in your default web browser
+browseURL("sankey_plot.html")
+
+
+```
+
+
+
+```{r}
+#trying again
+# Load required packages
+library(networkD3)
+library(dplyr)
+library(readr) # for read_csv, which handles data better than read.csv
+
+# Load the first set of clustering data (right side)
+data1 <- read.csv("K_means_Cluster_4.csv")
+data1 <- data1 %>%
+  rename(Cluster = X.kmeans_result.cluster., City = X.bigCities.geo_label_city.2.36..)
+
+# Load the second set of clustering data (left side)
+data2 <- read_csv("city_cluster_data - city_cluster_data.csv")
+data2 <- data2 %>%
+  rename(City = 1, Cluster = 2) %>%
+  mutate(City = as.character(City), Cluster = as.factor(Cluster))
+
+# Combine both sets of data with unique node identifiers
+data_combined <- bind_rows(data1 %>% mutate(Side = 'Right'),
+                           data2 %>% mutate(Side = 'Left'))
+
+```
+
+```{r}
+# Load required packages
+library(networkD3)
+library(dplyr)
+library(readr) # for read_csv
+
+# Load the first set of clustering data (right side)
+data1 <- read.csv("K_means_Cluster_4.csv")
+data1 <- data1 %>%
+  rename(Cluster = X.kmeans_result.cluster., City = X.bigCities.geo_label_city.2.36..) %>%
+  mutate(Cluster = as.character(Cluster), Side = 'Right') # Add Side column and convert to character
+
+# Load the second set of clustering data (left side)
+data2 <- read_csv("city_cluster_data - city_cluster_data.csv") %>%
+  rename(City = City, Cluster = Cluster) %>%
+  mutate(City = as.character(City), 
+         Cluster = as.character(Cluster), 
+         Side = 'Left') # Add Side column and convert to character
+
+# Combine both sets of data
+combined_data <- bind_rows(data1, data2)
+
+# Create nodes data frame
+nodes <- combined_data %>%
+  select(City, Cluster, Side) %>%
+  distinct() %>%
+  mutate(name = case_when(
+    Side == 'Left' ~ as.character(Cluster),
+    Side == 'Right' ~ as.character(City),
+    TRUE ~ as.character(City)
+  ))
+
+# Create links data frame
+links <- combined_data %>%
+  mutate(Source = case_when(
+    Side == 'Right' ~ as.character(Cluster),
+    TRUE ~ as.character(City)
+  ),
+  Target = case_when(
+    Side == 'Right' ~ as.character(City),
+    TRUE ~ as.character(Cluster)
+  )) %>%
+  group_by(Source, Target) %>%
+  summarize(Value = n())
+
+# Create the node index
+node_index <- match(nodes$name, union(links$Source, links$Target)) - 1
+
+# Adjust links to use index
+links <- links %>%
+  mutate(source = match(Source, nodes$name) - 1,
+         target = match(Target, nodes$name) - 1) %>%
+  select(source, target, Value)
+
+# Create the Sankey plot
+sankey_plot <- sankeyNetwork(
+  Links = links,
+  Nodes = nodes,
+  Source = "source",
+  Target = "target",
+  Value = "Value",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30,
+  sinksRight = FALSE
+)
+
+# Save the Sankey plot to an HTML file
+htmlwidgets::saveWidget(sankey_plot, "sankey_plot.html", selfcontained = TRUE)
+
+# Open the HTML file in your default web browser
+browseURL("sankey_plot.html")
+
+
+```
+
+```{r}
+# Load required packages
+library(networkD3)
+library(dplyr)
+library(readr) # for read_csv
+
+# Load the first set of clustering data (right side)
+data1 <- read_csv("K_means_Cluster_4.csv", show_col_types = FALSE)
+data1 <- data1 %>%
+  rename(Cluster = X.kmeans_result.cluster., City = X.bigCities.geo_label_city.2.36..) %>%
+  mutate(Cluster = as.character(Cluster), Side = 'Right') # Add Side column and convert to character
+
+# Load the second set of clustering data (left side)
+data2 <- read_csv("city_cluster_data - city_cluster_data.csv", show_col_types = FALSE) %>%
+  rename(City = City, Cluster = Cluster) %>%
+  mutate(City = as.character(City), 
+         Cluster = as.character(Cluster), 
+         Side = 'Left') # Add Side column and convert to character
+
+# Combine both sets of data
+combined_data <- bind_rows(data1, data2)
+
+# Create nodes data frame
+nodes <- combined_data %>%
+  select(City, Cluster, Side) %>%
+  distinct() %>%
+  mutate(name = case_when(
+    Side == 'Left' ~ as.character(Cluster),
+    Side == 'Right' ~ as.character(City),
+    TRUE ~ as.character(City)
+  ))
+
+# Create links data frame
+links <- combined_data %>%
+  mutate(Source = case_when(
+    Side == 'Right' ~ as.character(Cluster),
+    TRUE ~ as.character(City)
+  ),
+  Target = case_when(
+    Side == 'Right' ~ as.character(City),
+    TRUE ~ as.character(Cluster)
+  )) %>%
+  group_by(Source, Target) %>%
+  summarise(Value = n(), .groups = 'drop') # Use .groups to avoid implicit grouping
+
+# Create the node index
+nodes$name <- factor(nodes$name)
+node_index <- as.integer(nodes$name) - 1
+
+# Adjust links to use index
+links <- links %>%
+  mutate(source = as.integer(factor(links$Source, levels = nodes$name)) - 1,
+         target = as.integer(factor(links$Target, levels = nodes$name)) - 1) %>%
+  select(source, target, Value)
+
+# Create the Sankey plot
+sankey_plot <- sankeyNetwork(
+  Links = links,
+  Nodes = data.frame(name = levels(nodes$name)),
+  Source = "source",
+  Target = "target",
+  Value = "Value",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30,
+  sinksRight = FALSE
+)
+
+# Save the Sankey plot to an HTML file
+htmlwidgets::saveWidget(sankey_plot, "sankey_plot.html", selfcontained = TRUE)
+
+# Open the HTML file in your default web browser
+browseURL("sankey_plot.html")
+
+
+```
+
+
+```{r}
+# Load required packages
+library(networkD3)
+library(dplyr)
+library(readr) # for read_csv
+
+# Load the first set of clustering data (right side)
+data1 <- read_csv("K_means_Cluster_4.csv", show_col_types = FALSE)
+data1 <- data1 %>%
+  rename(Cluster = X.kmeans_result.cluster., City = X.bigCities.geo_label_city.2.36..) %>%
+  mutate(Cluster = as.character(Cluster), Side = 'Right')
+
+# Load the second set of clustering data (left side)
+data2 <- read_csv("city_cluster_data - city_cluster_data.csv", show_col_types = FALSE) %>%
+  rename(City = `City`, Cluster = `Cluster`) %>%
+  mutate(City = as.character(City), 
+         Cluster = as.character(Cluster), 
+         Side = 'Left')
+
+# Combine both sets of data
+combined_data <- bind_rows(data1, data2)
+
+# Create nodes data frame ensuring unique node names
+nodes <- distinct(
+  combined_data,
+  name = case_when(
+    Side == 'Left' ~ paste("Cluster", Cluster, sep = "-"),
+    Side == 'Right' ~ City
+  ),
+  .keep_all = TRUE
+)
+
+# Create an index for each node name
+nodes <- nodes %>%
+  arrange(name) %>%
+  mutate(index = row_number() - 1)
+
+# Create links data frame
+links <- combined_data %>%
+  mutate(
+    Source = case_when(
+      Side == 'Right' ~ as.character(Cluster),
+      TRUE ~ City
+    ),
+    Target = case_when(
+      Side == 'Right' ~ City,
+      TRUE ~ as.character(Cluster)
+    ),
+    Source = paste(Side, Source, sep = "-"),
+    Target = paste(Side, Target, sep = "-")
+  ) %>%
+  group_by(Source, Target) %>%
+  summarise(Value = n(), .groups = 'drop') %>%
+  left_join(select(nodes, name, index), by = c("Source" = "name")) %>%
+  rename(source = index) %>%
+  left_join(select(nodes, name, index), by = c("Target" = "name")) %>%
+  rename(target = index)
+
+# Create the Sankey plot
+sankey_plot <- sankeyNetwork(
+  Links = links,
+  Nodes = select(nodes, name, index),
+  Source = "source",
+  Target = "target",
+  Value = "Value",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30,
+  sinksRight = FALSE
+)
+
+# Save the Sankey plot to an HTML file
+htmlwidgets::saveWidget(sankey_plot, "sankey_plot.html", selfcontained = TRUE)
+
+# Open the HTML file in your default web browser
+browseURL("sankey_plot.html")
+
+```
+
+```{r}
+# Assuming previous steps were completed, we have `nodes` and `links`
+
+# Print the nodes and links dataframes to check their structure
+print(head(nodes))
+print(head(links))
+
+# Make sure there are no NAs or duplicates in the node names
+print(any(is.na(nodes$name)))
+print(any(duplicated(nodes$name)))
+
+# Check for NAs or non-positive values in the links' Value
+print(any(is.na(links$Value)))
+print(any(links$Value <= 0))
+
+# Create the Sankey plot and print it to the console to verify it is not NULL
+sankey_plot <- sankeyNetwork(
+  Links = links,
+  Nodes = select(nodes, name, index),
+  Source = "source",
+  Target = "target",
+  Value = "Value",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30,
+  sinksRight = FALSE
+)
+
+# Verify the sankey_plot object
+print(sankey_plot)
+
+# If the sankey_plot is not NULL, save the plot to an HTML file and open it
+if (!is.null(sankey_plot)) {
+  htmlwidgets::saveWidget(sankey_plot, "sankey_plot.html", selfcontained = TRUE)
+  browseURL("sankey_plot.html")
+} else {
+  cat("The sankey plot object is NULL.\n")
+}
+
+```
+
+```{r}
+# Assuming the rest of the code is the same as before and combined_data is created correctly
+
+# Create nodes dataframe with unique names
+nodes <- distinct(
+  combined_data,
+  name = case_when(
+    Side == 'Left' ~ paste(Side, Cluster, sep = "-"),
+    Side == 'Right' ~ paste(Side, City, sep = "-")
+  ),
+  .keep_all = TRUE
+) %>%
+  mutate(name = as.character(name)) %>%
+  arrange(name) %>%
+  mutate(index = row_number() - 1)
+
+# Create links dataframe with corresponding source and target index
+links <- combined_data %>%
+  mutate(
+    Source = case_when(
+      Side == 'Right' ~ paste(Side, Cluster, sep = "-"),
+      TRUE ~ paste(Side, City, sep = "-")
+    ),
+    Target = case_when(
+      Side == 'Right' ~ paste(Side, City, sep = "-"),
+      TRUE ~ paste(Side, Cluster, sep = "-")
+    )
+  ) %>%
+  group_by(Source, Target) %>%
+  summarise(Value = n(), .groups = 'drop') %>%
+  ungroup() %>%
+  left_join(nodes, by = c("Source" = "name")) %>%
+  rename(source = index) %>%
+  left_join(nodes, by = c("Target" = "name")) %>%
+  rename(target = index) %>%
+  filter(!is.na(source) & !is.na(target)) # Filter out any NA values
+
+# Print the nodes and links dataframes to check their structure
+print(head(nodes))
+print(head(links))
+
+# Create the Sankey plot
+sankey_plot <- sankeyNetwork(
+  Links = links,
+  Nodes = select(nodes, name, index),
+  Source = "source",
+  Target = "target",
+  Value = "Value",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30,
+  sinksRight = FALSE
+)
+
+# Check the sankey_plot object
+print(sankey_plot)
+
+# If the sankey_plot is not NULL, save the plot to an HTML file and open it
+if (!is.null(sankey_plot)) {
+  htmlwidgets::saveWidget(sankey_plot, "sankey_plot.html", selfcontained = TRUE)
+  browseURL("sankey_plot.html")
+} else {
+  cat("The sankey plot object is NULL. Check the nodes and links dataframes.\n")
+}
+
+
+```
+
+
+
+```{r}
+# Create the Sankey plot with adjusted margins and font size
+sankey_plot <- sankeyNetwork(
+  Links = links,
+  Nodes = select(nodes, name, index),
+  Source = "source",
+  Target = "target",
+  Value = "Value",
+  NodeID = "name",
+  fontSize = 10, # Adjust font size
+  nodeWidth = 30,
+  sinksRight = FALSE,
+  margin = list(top = 30, bottom = 30, left = 150, right = 150) # Adjust margins
+)
+
+# Check the sankey_plot object
+print(sankey_plot)
+
+# If the sankey_plot is not NULL, save the plot to an HTML file and open it
+if (!is.null(sankey_plot)) {
+  htmlwidgets::saveWidget(sankey_plot, "sankey_plot.html", selfcontained = TRUE)
+  browseURL("sankey_plot.html")
+} else {
+  cat("The sankey plot object is NULL. Check the nodes and links dataframes.\n")
+}
+
+
+
+```
+
+
+
+```{r}
+#opening as an html file
+# Load required packages
+library(networkD3)
+library(dplyr)
+
+# Load the data
+data <- read.csv("city_cluster_data - city_cluster_data.csv")
+
+# Rename the columns for easier reference
+data <- data %>%
+  rename(Cluster = Cluster, City = City)
+
+# Create a frequency table to use for the Sankey plot
+sankey_data <- data %>%
+  count(Cluster, City) %>%
+  mutate(Cluster = as.character(Cluster), City = as.character(City))
+
+# The 'sankeyNetwork' function expects the source and target to be numeric indices, not actual names
+# so we need to create a node list and then use their indices
+node_list <- unique(c(sankey_data$Cluster, sankey_data$City))
+
+# Create a Links dataframe with source and target as indices
+sankey_links <- sankey_data %>%
+  mutate(source = match(Cluster, node_list) - 1,
+         target = match(City, node_list) - 1)
+
+# Create Nodes dataframe with names
+sankey_nodes <- data.frame(name = node_list)
+
+# Create the Sankey plot
+sankey_plot <- sankeyNetwork(
+  Links = sankey_links,
+  Nodes = sankey_nodes,
+  Source = "source",
+  Target = "target",
+  Value = "n",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30
+)
+
+# Print the Sankey plot to the viewer
+print(sankey_plot)
+
+# Save the Sankey plot to an HTML file
+htmlwidgets::saveWidget(sankey_plot, "sankey_plot.html", selfcontained = TRUE)
+
+# Open the HTML file in your default web browser
+browseURL("sankey_plot.html")
+
+
+
+
+```
+```{r}
+data = read.csv("K_means_Cluster_3.csv")
+#View(data)
+
+data$Cluster = data[,1]
+data$City = data[,2]
+data = data[,3:4]
+
+Nicolai_df = read.csv("city_cluster_data - city_cluster_data.csv")
+joined_data = data %>% left_join(Nicolai_df, by = "City")
+#View(joined_data)
+joined_data = joined_data %>% mutate( kmeans = Cluster.x, hc = Cluster.y)
+#View(joined_data)
+
+for (i in 1:3){
+  print(plot_sankey(joined_data %>% filter(hc == i), from_to = c("kmeans", "City", "hc")))
+}
+
+plot_sankey(joined_data, from_to = c("kmeans", "City", "hc"))
+
+
+
+
+```
+
+
+
+
+
+
