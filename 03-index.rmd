@@ -5,7 +5,7 @@ date: "2024-04-21"
 output: html_document
 ---
 
-## initial indexing of column names
+# initial indexing of column names
 
 ```{r}
 columnnames = colnames(cities_clean %>% select(!c(geo_label_city, geo_fips_code, date_label)))
@@ -113,7 +113,7 @@ df_varclusters <- data.frame(df_t, Cluster = as.factor(varclusters)) %>% select(
 #dend <- as.dendrogram(hc_columns) # Visualizing dendrogram with actual column names
 #labels(dend) <- rownames(numeric_data) # Adding names as labels
 #plot(hc_columns, main = "Dendrogram of Columns", xlab = "Columns", sub = "", ylab = "Height")
-df_varclusters
+df_varclusters$variables = rownames(df_varclusters)
 ```
 
 
@@ -135,6 +135,16 @@ varclusters_red <- cutree(hc_redcolumns, k = 3)
 # If you want to see which columns are in each cluster
 
 df_redvarclusters <- data.frame(df_tred, Cluster = as.factor(varclusters_red)) %>% select(Cluster)
+df_redvarclusters$variables = rownames(df_redvarclusters)
+```
+
+```{r}
+varclusters_joined = df_redvarclusters %>% left_join(
+  df_varclusters, by = join_by("variables")
+)
+# for (i in 1:3){
+# print(plot_sankey(varclusters_joined %>% filter(Cluster.x == i), from_to = c("Cluster.x", "clusters", "Cluster.y")))
+# }
 ```
 
 
@@ -145,15 +155,15 @@ df_reddisplay = df_redvarclusters %>% mutate(col = rownames(df_redvarclusters)) 
 #View(df_redvarclusters)
 #View(df_varclusters)
 
-for (i in 1:6){
-print(plot_sankey(df_display %>% filter(Cluster == i), from_to = c("col", "ctgy", "Cluster", "sub_ctgy")))
-}
+# for (i in 1:6){
+# print(plot_sankey(df_display %>% filter(Cluster == i), from_to = c("col", "ctgy", "Cluster", "sub_ctgy")))
+# }
 ```
 
 ```{r}
-for (i in 1:3){
-print(plot_sankey(df_reddisplay %>% filter(Cluster == i), from_to = c("col", "ctgy", "Cluster", "sub_ctgy")))
-}
+# for (i in 1:3){
+# print(plot_sankey(df_reddisplay %>% filter(Cluster == i), from_to = c("col", "ctgy", "Cluster", "sub_ctgy")))
+# }
 ```
 
 
@@ -194,11 +204,6 @@ plot_sankey <- function(df, from_to, count_fn = "n", fn_col = NULL, ...)
 plot_sankey(df_cat, from_to = c("ctgy", "sub_ctgy", "col"))
 ```
 
-```{r}
-
-```
-
-
 ## Build Scoring System
 ```{r}
 ## Cluster name
@@ -211,65 +216,20 @@ df_display = df_display %>%  mutate(Cluster = case_when(
     Cluster == 6 ~ "std_drug_index",
     TRUE ~ as.character(Cluster)  # Fallback, in case there are other unexpected values
   ))
-df_display
+df_display %>% distinct(Cluster) %>% pull(Cluster)
+
 ```
 ## Building indexes
 
 ```{r}
-clusters_list <- split(df_display$col, df_display$Cluster)
+#clusters_list <- split(df_display$col, df_display$Cluster)
 # Initialize an empty dataframe to store the final results
 final_df <- cities_clean %>% select(-c("geo_fips_code", "date_label"))
 
-# Loop through each cluster
-for(cluster in names(clusters_list)) {
-  # Subset values_df for the current cluster's variables
-  subset_df <- cities_clean %>%
-    select(geo_label_city, all_of(clusters_list[[cluster]]))
-  
-  # Calculate the average for each city in this cluster
-  averages_df <- subset_df %>%
-    group_by(geo_label_city) %>%
-    summarise(!!paste0("Cluster", cluster) := mean(across(-geo_label_city), na.rm = TRUE), .groups = 'drop')
-  
-  # Merge the averages back into the final_df
-  final_df <- left_join(final_df, averages_df, by = "geo_label_city")
-}
-
-# View the final dataframe
-print(final_df)
-averages_df <- subset_df %>%
-  group_by(geo_label_city) %>%
-  summarise(
-    !!paste0("Cluster", cluster) := mean(across(where(is.numeric)), na.rm = TRUE),
-    .groups = 'drop'
-  )
-averages_df
-averages_df <- subset_df %>%
-  group_by(geo_label_city) %>%
-  summarise(across(-geo_label_city, mean, na.rm = TRUE), .groups = 'drop')
-
-```
-
-
-```{r}
-
-numeric_columns <- select_if(cities_clean, is.numeric)
-categorical_columns <- select_if(cities_clean, Negate(is.numeric))
-
-# Scale numeric columns
-scaled_numeric_columns <- scale(numeric_columns)
-
-# Combine scaled numeric with categorical columns
-df_scaled <- bind_cols(as.data.frame(scaled_numeric_columns), categorical_columns)
-
-# Convert df_values to long format
-#df_clusters_long <- pivot_longer(df_clusters, cols = -city, names_to = "variable", values_to = "cluster")
-df_values_long <- pivot_longer(df_scaled, cols = -city, names_to = "variable", values_to = "value")
 ```
 
 Scale between 0-1 with percent rank
 ```{r}
-View(c)
 final_long = final_df %>% pivot_longer(!geo_label_city, names_to = "var", values_to = "value")
 final_long = final_long %>% left_join(
   df_display %>% select(Cluster, col),
@@ -281,7 +241,7 @@ final_idx = final_long %>% mutate(
   .by = var
 ) %>% 
   summarise(
-    idx_value = mean(ptile, na.rm = TRUE),
+    idx_value = median(ptile, na.rm = TRUE),
     .by = c(Cluster, geo_label_city)
   ) %>% 
   pivot_wider(id_cols = geo_label_city, names_from = Cluster, values_from = idx_value)
@@ -289,14 +249,101 @@ final_idx = final_long %>% mutate(
 ```
 
 ```{r}
+library(ggplot2)
 df_cityclusters = df_clusters_joined %>% select(Cities, Cluster.x, Cluster.y)
 complete = final_idx %>% left_join(df_cityclusters, by = join_by("geo_label_city" == "Cities"))
-complete
+complete = complete %>% 
+  mutate(total_score = ((-1 * health_poverty_index + -1 * safety_index + -1 * std_drug_index + income_eq_educ_index) / 5),
+         bigcity_score = (bigcity_segregat_index - suburb_sprawl_index) / 2)
+complete %>% select(geo_label_city, ends_with("index"), ends_with("score")) %>% pivot_longer(!geo_label_city) %>% 
+  ggplot(aes(value, fill = name)) + geom_density(alpha = .6) +
+  facet_grid(rows = vars(name), scales = "free")
 ```
 
 ```{r}
+View(complete %>% select(geo_label_city, ends_with("score")))
+```
+
+
+```{r}
 idx_names = colnames(complete)[endsWith(colnames(complete), "index")]
-complete %>% group_by(Cluster.x) %>% summarise(across(.cols = idx_names, median, na.rm = TRUE ))
+index_average = complete %>% group_by(Cluster.x) %>% summarise(across(.cols = idx_names, median, na.rm = TRUE ))
 correlate(complete %>% select(ends_with("index")))
+```
+
+```{r}
+happy_norepeats = happy %>% filter(!(City == "Columbus" & State == "Georgia")) %>% filter(!(City == "Portland" & State == "Maine"))
+df_model_idx = complete %>% left_join(happy_norepeats, by = join_by( "geo_label_city"=="City"))
+```
+
+
+
+```{r}
+correlate(df_model_idx$`Total Score`, df_model_idx$total_score)
+```
+```{r}
+df_model_idx %>% select(total_score, geo_label_city) %>% arrange((total_score)) %>% head(5)
+```
+```{r}
+df_model_idx <- df_model_idx %>%
+  mutate(intRanking = rank(-total_score, ties.method = "first"),
+         extRanking = rank(-`Total Score`, ties.method = "first")) %>%
+  arrange(intRanking) %>% 
+  mutate(diff = intRanking - extRanking)
+
+mean(abs(df_model_idx$diff))
+median(abs(df_model_idx$diff))
+View(df_model_idx %>% select(geo_label_city, intRanking, extRanking, diff))
+```
+```{r}
+df_model_idx_scaled = df_model_idx
+df_model_idx_scaled$ext_score_scale = scale(df_model_idx$`Total Score`)
+df_model_idx_scaled$int_score_scale = scale(df_model_idx$total_score)
+```
+
+```{r}
+pop_change = read.csv("pop_change.csv")
+#View(pop_change)
+cities_list = cities_clean$geo_label_city
+
+find_all_matching_cities <- function(metro_description, cities) {
+  matched_cities <- cities[str_detect(metro_description, cities)]
+  if (length(matched_cities) == 0) {
+    return(NA)  # Return NA if no match is found
+  }
+  return(matched_cities)
+}
+pop_change$Metro.Area[str_detect(pop_change$Metro.Area, "New York")] = "New York City"
+# Applying the function to each metro_area and creating a list column
+pop_change$matched_cities <- map(pop_change$Metro.Area, find_all_matching_cities, cities = cities_list)
+
+# Expanding the data frame so that each city gets its own row
+data_expanded <- pop_change %>%
+  unnest(matched_cities) %>%
+  rename(major_city = matched_cities)
+
+# Replace NA with a placeholder if you want
+data_expanded$major_city[is.na(data_expanded$major_city)] <- "No Major City Matched"
+data_expanded$major_city[str_detect(data_expanded$Metro.Area, "New York")] = "New York City"
+## A number were false matches: Drop these
+drop_indices = c(67, 83, 89, 118, 141, 145, 169)
+data_expanded = data_expanded[-drop_indices, ]
+data_pop = data_expanded %>% filter(major_city != "No Major City Matched") %>%  select(!Metro.Area)
+
+data_pop
+```
+```{r}
+data_pop =  data_pop %>%
+  mutate(across(c(X2023, X2022, X2021, X2020), ~as.numeric(gsub(",", "", .))))
+data_joined = data_pop %>% left_join(
+  df_model_idx, by = join_by("major_city" == "geo_label_city")
+)
+data_joined %>% select(major_city, X2023, bigcity_score)
+data_pop =  data_pop %>%
+  mutate(across(c(X2023, X2022, X2021, X2020), ~as.numeric(gsub(",", "", .))))
+correlate(data_joined$X2023, data_joined$bigcity_score)
+```
+```{r}
+View(data_joined %>% select(major_city, X2023, bigcity_score))
 ```
 

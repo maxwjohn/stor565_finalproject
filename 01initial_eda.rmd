@@ -111,7 +111,7 @@ Things we could potentially predict:
 - Places data: https://catalog.data.gov/dataset/places-local-data-for-better-health-county-data-2020-release-94305
 
 
-## Response Variable: 
+## Response Variable: City ranking
 
 This section of our model will be attempting to predict the happiness of a city, from this source https://wallethub.com/edu/happiest-places-to-live/32619, using the data from our dataframe
 

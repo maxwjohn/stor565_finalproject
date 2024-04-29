@@ -1,125 +1,74 @@
 ---
-title: "PCA"
-author: "Nicolai"
-date: "2024-03-29"
+title: "05final_summary"
+author: "Max"
+date: "2024-04-29"
 output: html_document
 ---
 
-## Dimension Reduction: Method 1: PCA
-
 ```{r}
-library(cluster)
-library(factoextra)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+
 ```
 
 
+
 ```{r}
-# replace transposed_data / city_var depending on if we want groupings for the variables or the cities
-# Perform PCA
-pca_result <- prcomp(numeric_data, scale. = TRUE)
-summary(pca_result)
-plot(pca_result$x[,1], pca_result$x[,2])
-pca.var <- pca_result$sdev^2
-# percantage of variation that each PCA accounts for
-pca.var.per <- round(pca.var/sum(pca.var)*100, 1)
-barplot(pca.var.per, main="Scree Plot", xlab="Principal Component", ylab="Percent Variation")
-```
-## PCA on this to check what 
-```{r}
-##### PCA continued
-library(ggplot2)
-## get the name of the top 10 measurements (cities) that contribute most to pc1.
-loading_scores <- pca_result$rotation[,1]
-var_scores <- abs(loading_scores) ## get the magnitudes
-var_score_ranked <- sort(var_scores, decreasing=TRUE)
-top_10_vars <- names(var_score_ranked[1:10])
- 
-top_10_vars ## show the names of the top 10 cities
- 
-pca_result$rotation[top_10_vars,1]
+#Clean data code (data defined as latest_filtered)
+#Taking out na values and only using 2021
+cities <- read_csv("data/bigcities_wide.csv")
+us_total = cities %>% filter(geo_label_city == "U.S. Total")
+
+## Work with 2021 or 2020 data
+new_cities = cities %>% filter(date_label == 2021)
+na_count = colSums(is.na(new_cities)) / nrow(new_cities)
+lowna = na_count[colSums(is.na(new_cities)) / nrow(new_cities) < .33]
+lowna_cols = names(lowna)
+cities_nona = new_cities %>% select(all_of(lowna_cols))
+## Impute as dataframe
+cities_clean <- cities_nona %>%
+  mutate(across(where(is.numeric), ~ifelse(is.na(.), median(., na.rm = TRUE), .))) %>% 
+  filter(geo_label_city != "U.S. Total")
+
+numeric_data <- cities_clean %>% filter(geo_label_city != "U.S. Total") %>% select(!c("geo_label_city", "geo_fips_code", "date_label")) # Exclude the first column containing city names
+rownames(numeric_data) = cities_clean$geo_label_city  # Transpose the numeric data
+
 ```
 
-# Hierarchical clustering with PCA
+## Exploratory Data Analysis
+
+Our goal is to see what we can predict given the quality of a city. To start, we will build a model attempting to give a "rating" of a city, comparing this to another source's list on what are the best cities. 
+
+The first step is going to be choosing suitable variables.
+
+The initial data analysis gave us about 
+
 ```{r}
-num_components <- 3  # number of principal components
-
-# Extracting PCA scores for selected components
-pca_scores <- pca_result$x[, 1:12]
-
-# Performing hierarchical clustering
-hc_result <- hclust(dist(pca_scores), method = "complete")
-
-# Visualizing hierarchical clustering results
-plot(hc_result, main = "Hierarchical Clustering Dendrogram")
-
-# heatmap to visualize clustered samples
-cluster_order <- cutree(hc_result, k = 3)  
-heatmap(pca_scores[order(cluster_order), ], scale = "row", 
-        Rowv = NA, Colv = NA, col = heat.colors(256),
-        main = "Clustered Samples Heatmap")
-```
-```{r, fig.width=8, fig.height=10}
-dend <- as.dendrogram(hc_result) # Visualizing dendrogram with actual column names
-#labels(dend) <- rownames(numeric_data) # Adding names as labels
-plot(dend, main = "Dendrogram for Hierarchical Clustering", horiz = TRUE)
-
-########### Ordering clusters
-# HC
-num_clusters <- 3  # Adjustable
-clusters <- cutree(hc_result, k = num_clusters)
-
-# order of observations
-order <- order.dendrogram(dend)
-
-# DF with the labels and cluster assignments
-cluster_labels <- data.frame( Cluster = clusters[order])
-pca_clusters <- data.frame(pca_scores, Cluster = as.factor(clusters))
-#pca_clusters %>% select(geo_label_city, Cluster)
-#View(cluster_labels)
-```
-
-## Hierarchical clustering on columns
-```{r}
-scaled = scale(cities_clean %>% select(!c(geo_label_city, geo_fips_code, date_label)))
-df_t <- t(scaled)
-
-# Calculate the distance matrix using Euclidean distance (you can choose another method)
-dist_matrix <- dist(df_t, method = "euclidean")
-
-# Perform hierarchical clustering
-hc_columns <- hclust(dist_matrix, method = "complete") # You can choose another linkage method
-
-# Plot the dendrogram
-plot(hc_columns, main = "Dendrogram of Columns", xlab = "Columns", sub = "", ylab = "Height")
-```
-#### Checking optimal clusters for variables
-```{r}
-sil_width <- vector("numeric", length = 14) # Adjust the length for the number of clusters to inspect minus one
-for (k in 2:15) { # Starts from 2 because silhouette doesn't work with a single cluster
-  cluster_assignments <- cutree(hc_columns, k)
-  silhouette_analysis <- silhouette(cluster_assignments, dist_matrix)
-  sil_width[k-1] <- mean(silhouette_analysis[, 3]) # Average silhouette width
+#colnames(num_cols) # These are the variables
+## label columns are geo_label_city, geo_fips_code
+## Numerical columns
+num_cols = cities_clean %>% select(!c(geo_label_city, geo_fips_code, date_label))## 88 columns
+par(mfrow=c(3,3), mar=c(4,4,2,0.5))
+# Iterate over numeric columns and plot histograms
+for (j in seq_along(num_cols)) {
+  hist(num_cols[[j]], 
+       xlab=names(num_cols)[j],
+       main=paste("Histogram of", names(num_cols)[j]),
+       col="lightblue", breaks=20)
 }
-
-# Plot the average silhouette width
-plot(2:15, sil_width, type = "b", xlab = "Number of Clusters", ylab = "Average Silhouette Width", main = "Silhouette Method for Optimal Clusters")
 ```
 
-```{r}
-varclusters <- cutree(hc_columns, k = 6)
+The initial histogram shows a decent amount of variation in the variables. Because we have high dimension (p) and low sample size, this can lead to a lot of problems with dimensionality. To fix this, we are going to try to reduce multicollinearity by using correlation and domain understanding.
 
-# If you want to see which columns are in each cluster
-
-df_varclusters <- data.frame(df_t, Cluster = as.factor(varclusters)) %>% select(Cluster)
-dend <- as.dendrogram(hc_columns) # Visualizing dendrogram with actual column names
-#labels(dend) <- rownames(numeric_data) # Adding names as labels
-plot(hc_columns, main = "Dendrogram of Columns", xlab = "Columns", sub = "", ylab = "Height")
-```
+Before this, we are going to do some initial clustering to see if there are any groupings that we could potentially use to reduce dimensions.
 
 
 There are a lot of variables, most seem to be fairly normal, although there does seem to be some categories that have similar distributions. Deaths, drug related variables, transporation variables, all seem to be pretty similar within its own group.
 
 ## Second Method: Dimension Reduction through feature selection by domain knowledge
+
 ```{r}
 ## 80 is too much to look at overall, but for some EDA going to look at first 10
 cor(num_cols[,1:10]) # Very high correlation, need to see further how bad this problem is
@@ -408,3 +357,369 @@ library(networkD3)
 ```
 Variable clusters vary greatly between the two.
 
+# initial indexing of column names
+
+```{r}
+columnnames = colnames(cities_clean %>% select(!c(geo_label_city, geo_fips_code, date_label)))
+columnnames
+df_ctgy_health = list(
+  tibble(ctgy = "health", sub_ctgy = "deaths", 
+         col = columnnames[str_detect(columnnames, "Death|Suicide") & !str_detect(columnnames, "HIV|Diabetes") ]),
+  tibble(ctgy = "health", sub_ctgy = "births", 
+         col = columnnames[str_detect(columnnames, "Birth")]),
+  tibble(ctgy = "health", sub_ctgy = "vaccinations", 
+         col = columnnames[str_detect(columnnames, "Vaccination")]),
+  tibble(ctgy = "health", sub_ctgy = "medicalcare", 
+         col = columnnames[str_detect(columnnames, "Care|Uninsured")]),
+  tibble(ctgy = "health", sub_ctgy = "stds", 
+         col = columnnames[str_detect(columnnames, "HIV|Syphilis|Chlamydia|Gonorrhea")]),
+  tibble(ctgy = "health", sub_ctgy = "conditions/disease", 
+         col = columnnames[str_detect(columnnames, "Disabilities|Diab|Blood|Tuber|Obesity|Mental")]),
+    tibble(ctgy = "health", sub_ctgy = "other_health", 
+         col = columnnames[str_detect(columnnames, "Inactivity|Smok|Drink|Expect")])
+) %>% bind_rows()
+leftover = columnnames %>% setdiff(df_ctgy_health %>% pull(col))
+df_ctgy_income = list(
+  tibble(ctgy = "Income", sub_ctgy = "poverty", 
+         col = leftover[str_detect(leftover, "Poverty|Unempl|Service")]),
+  tibble(ctgy = "Income", sub_ctgy = "inc_level", 
+         col = leftover[str_detect(leftover, "Inequ|Per-cap|Higher-Inc")])
+  ) %>% bind_rows()
+leftover = leftover %>% setdiff(df_ctgy_income %>% pull(col))
+df_ctgy_transp =  list(
+  tibble(ctgy = "transportation", sub_ctgy = "public", 
+         col = leftover[str_detect(leftover, "Bike|Walk|Public")]),
+    tibble(ctgy = "transportation", sub_ctgy = "drive", 
+         col = leftover[str_detect(leftover, "Car|Driv")])
+  
+  ) %>% bind_rows()
+leftover = leftover %>% setdiff(df_ctgy_transp %>% pull(col))
+df_ctgy_hous = list(
+  tibble(ctgy = "housing", sub_ctgy = "quality", 
+         col = leftover[str_detect(leftover, "Lead")]),
+    tibble(ctgy = "housing", sub_ctgy = "ownership", 
+         col = leftover[str_detect(leftover, "Units|Owner")]),
+  tibble(ctgy = "housing", sub_ctgy = "homeless", 
+         col = leftover[str_detect(leftover, "Homelessness")]),
+  tibble(ctgy = "housing", sub_ctgy = "cost", 
+         col = leftover[str_detect(leftover, "Cost")])
+  ) %>% bind_rows()
+leftover = leftover %>% setdiff(df_ctgy_hous %>% pull(col))
+df_ctgy_demog_life  = list(
+  tibble(ctgy = "demography", sub_ctgy = "low-inc", 
+         col = leftover[str_detect(leftover, "Children|Single-Parent|inority|Foreign|Spanish")]),
+    tibble(ctgy = "demography", sub_ctgy = "hi-inc", 
+         col = leftover[str_detect(leftover, "Grad|Seniors|Chinese|English")]),
+  tibble(ctgy = "demography", sub_ctgy = "segreg", 
+         col = leftover[str_detect(leftover, "Segregation")]),
+    tibble(ctgy = "demography", sub_ctgy = "safety", 
+         col = leftover[str_detect(leftover, "Air Quality|Violent|Killings|Homicides")]),
+    tibble(ctgy = "demography", sub_ctgy = "other", 
+         col = leftover[str_detect(leftover, "Preschool|Supermarket|Density")])
+  ) %>% bind_rows()
+leftover = leftover %>% setdiff(df_ctgy_demog_life %>% pull(col))
+leftover
+```
+```{r}
+df_cat = df_ctgy_health %>% 
+  rbind(df_ctgy_demog_life) %>% 
+  rbind(df_ctgy_hous) %>% 
+  rbind(df_ctgy_income) %>% 
+  rbind(df_ctgy_transp)
+```
+
+
+## Hierarchical clustering on columns
+```{r}
+scaled = scale(cities_clean %>% select(!c(geo_label_city, geo_fips_code, date_label)))
+df_t <- t(scaled)
+
+# Calculate the distance matrix using Euclidean distance (you can choose another method)
+dist_matrix <- dist(df_t, method = "euclidean")
+
+# Perform hierarchical clustering
+hc_columns <- hclust(dist_matrix, method = "complete") # You can choose another linkage method
+
+# Plot the dendrogram
+plot(hc_columns, main = "Dendrogram of Columns", xlab = "Columns", sub = "", ylab = "Height")
+```
+#### Checking optimal clusters for variables
+```{r}
+sil_width <- vector("numeric", length = 14) # Adjust the length for the number of clusters to inspect minus one
+for (k in 2:15) { # Starts from 2 because silhouette doesn't work with a single cluster
+  cluster_assignments <- cutree(hc_columns, k)
+  silhouette_analysis <- silhouette(cluster_assignments, dist_matrix)
+  sil_width[k-1] <- mean(silhouette_analysis[, 3]) # Average silhouette width
+}
+
+# Plot the average silhouette width
+plot(2:15, sil_width, type = "b", xlab = "Number of Clusters", ylab = "Average Silhouette Width", main = "Silhouette Method for Optimal Clusters")
+```
+
+```{r}
+varclusters <- cutree(hc_columns, k = 6)
+
+# If you want to see which columns are in each cluster
+
+df_varclusters <- data.frame(df_t, Cluster = as.factor(varclusters)) %>% select(Cluster)
+#dend <- as.dendrogram(hc_columns) # Visualizing dendrogram with actual column names
+#labels(dend) <- rownames(numeric_data) # Adding names as labels
+#plot(hc_columns, main = "Dendrogram of Columns", xlab = "Columns", sub = "", ylab = "Height")
+df_varclusters$variables = rownames(df_varclusters)
+```
+
+
+# Hierarchical clustering on columns
+```{r}
+df_tred <- t(scaled_red)
+
+# Calculate the distance matrix using Euclidean distance (you can choose another method)
+dist_red_matrix <- dist(df_tred, method = "euclidean")
+
+# Perform hierarchical clustering
+hc_redcolumns <- hclust(dist_red_matrix, method = "complete") # You can choose another linkage method
+
+# Plot the dendrogram
+plot(hc_redcolumns, main = "Dendrogram of Columns", xlab = "Columns", sub = "", ylab = "Height")
+
+varclusters_red <- cutree(hc_redcolumns, k = 3)
+
+# If you want to see which columns are in each cluster
+
+df_redvarclusters <- data.frame(df_tred, Cluster = as.factor(varclusters_red)) %>% select(Cluster)
+df_redvarclusters$variables = rownames(df_redvarclusters)
+```
+
+```{r}
+varclusters_joined = df_redvarclusters %>% left_join(
+  df_varclusters, by = join_by("variables")
+)
+# for (i in 1:3){
+# print(plot_sankey(varclusters_joined %>% filter(Cluster.x == i), from_to = c("Cluster.x", "clusters", "Cluster.y")))
+# }
+```
+
+
+```{r}
+df_display = df_varclusters %>% mutate(col = rownames(df_varclusters)) %>% left_join(df_cat, by = "col")
+df_reddisplay = df_redvarclusters %>% mutate(col = rownames(df_redvarclusters)) %>% left_join(df_cat, by = "col")
+
+#View(df_redvarclusters)
+#View(df_varclusters)
+
+# for (i in 1:6){
+# print(plot_sankey(df_display %>% filter(Cluster == i), from_to = c("col", "ctgy", "Cluster", "sub_ctgy")))
+# }
+```
+
+```{r}
+# for (i in 1:3){
+# print(plot_sankey(df_reddisplay %>% filter(Cluster == i), from_to = c("col", "ctgy", "Cluster", "sub_ctgy")))
+# }
+```
+
+
+
+```{r}
+library(igraph)
+library(networkD3)
+plot_sankey <- function(df, from_to, count_fn = "n", fn_col = NULL, ...)
+{
+  count_fn <- match.arg(count_fn, c("n", "n_distinct", "sum"), several.ok = FALSE)
+  from_to_ls <- lapply(1:(length(from_to)-1L), function(x) {
+    setNames(from_to[x:(x+1L)], c("from", "to"))
+  })
+  the_dots <- list(...)
+  dat_ls <- lapply(from_to_ls, function(x){
+    dat <- df %>%  dplyr::mutate(dplyr::across(dplyr::all_of(unname(x)),
+                  function(y){
+                    paste(dplyr::cur_column(), y, sep = ": ")
+                  })) %>% dplyr::rename(dplyr::all_of(x)) %>% dplyr::group_by(from, to)
+  if (count_fn == "n"){
+    dat <- dat %>% summarise(n = n(), .groups = "drop")
+  }
+  else {
+    dat <- dat %>% dplyr::summarise(dplyr::across(dplyr::all_of(fn_col),
+                                                  function(y) {
+                                                    do.call(count_fn, append(list(y), the_dots))
+                                                  }, .names = "n"), .groups = "drop")}
+    dat})
+    dat_ls <- dat_ls[sapply(dat_ls, inherits, "data.frame")]
+    dat <- do.call(rbind, dat_ls)
+    graph_from_df <- igraph::graph_from_data_frame(dat)
+    g_d3 <- networkD3::igraph_to_networkD3(graph_from_df)
+    networkD3::sankeyNetwork(Links = g_d3$links, Nodes = g_d3$nodes, Source = "source", Target = "target", Value = "value", NodeID = "name", fontSize = 11, margin = c(top = 100, bottom= 100), sinksRight = FALSE)
+}
+```
+
+```{r}
+plot_sankey(df_cat, from_to = c("ctgy", "sub_ctgy", "col"))
+```
+
+## Build Scoring System
+```{r}
+## Cluster name
+df_display = df_display %>%  mutate(Cluster = case_when(
+    Cluster == 1 ~ "health_poverty_index",
+    Cluster == 2 ~ "income_eq_educ_index",
+    Cluster == 3 ~ "safety_index",
+    Cluster == 4 ~ "suburb_sprawl_index",
+    Cluster == 5 ~ "bigcity_segregat_index",
+    Cluster == 6 ~ "std_drug_index",
+    TRUE ~ as.character(Cluster)  # Fallback, in case there are other unexpected values
+  ))
+df_display %>% distinct(Cluster) %>% pull(Cluster)
+
+```
+## Building indexes
+
+```{r}
+#clusters_list <- split(df_display$col, df_display$Cluster)
+# Initialize an empty dataframe to store the final results
+final_df <- cities_clean %>% select(-c("geo_fips_code", "date_label"))
+
+```
+
+Scale between 0-1 with percent rank
+```{r}
+final_long = final_df %>% pivot_longer(!geo_label_city, names_to = "var", values_to = "value")
+final_long = final_long %>% left_join(
+  df_display %>% select(Cluster, col),
+  by = join_by("var" == "col")
+) 
+final_idx = final_long %>% mutate(
+  ptile = percent_rank(value),
+  ptile = dplyr::case_when(ptile < (1 - max(ptile, na.rm = TRUE)) ~ (1 - max(ptile, na.rm = TRUE)), .default = ptile),
+  .by = var
+) %>% 
+  summarise(
+    idx_value = median(ptile, na.rm = TRUE),
+    .by = c(Cluster, geo_label_city)
+  ) %>% 
+  pivot_wider(id_cols = geo_label_city, names_from = Cluster, values_from = idx_value)
+
+```
+
+```{r}
+library(ggplot2)
+df_cityclusters = df_clusters_joined %>% select(Cities, Cluster.x, Cluster.y)
+complete = final_idx %>% left_join(df_cityclusters, by = join_by("geo_label_city" == "Cities"))
+complete = complete %>% 
+  mutate(total_score = ((-1 * health_poverty_index + -1 * safety_index + -1 * std_drug_index + income_eq_educ_index) / 5),
+         bigcity_score = (bigcity_segregat_index - suburb_sprawl_index) / 2)
+complete %>% select(geo_label_city, ends_with("index"), ends_with("score")) %>% pivot_longer(!geo_label_city) %>% 
+  ggplot(aes(value, fill = name)) + geom_density(alpha = .6) +
+  facet_grid(rows = vars(name), scales = "free")
+```
+
+```{r}
+View(complete %>% select(geo_label_city, ends_with("score")))
+```
+
+
+```{r}
+idx_names = colnames(complete)[endsWith(colnames(complete), "index")]
+index_average = complete %>% group_by(Cluster.x) %>% summarise(across(.cols = idx_names, median, na.rm = TRUE ))
+correlate(complete %>% select(ends_with("index")))
+```
+
+```{r}
+happy_norepeats = happy %>% filter(!(City == "Columbus" & State == "Georgia")) %>% filter(!(City == "Portland" & State == "Maine"))
+df_model_idx = complete %>% left_join(happy_norepeats, by = join_by( "geo_label_city"=="City"))
+```
+
+
+
+```{r}
+correlate(df_model_idx$`Total Score`, df_model_idx$total_score)
+```
+```{r}
+df_model_idx %>% select(total_score, geo_label_city) %>% arrange((total_score)) %>% head(5)
+```
+```{r}
+df_model_idx <- df_model_idx %>%
+  mutate(intRanking = rank(-total_score, ties.method = "first"),
+         extRanking = rank(-`Total Score`, ties.method = "first")) %>%
+  arrange(intRanking) %>% 
+  mutate(diff = intRanking - extRanking)
+
+mean(abs(df_model_idx$diff))
+median(abs(df_model_idx$diff))
+View(df_model_idx %>% select(geo_label_city, intRanking, extRanking, diff))
+```
+```{r}
+df_model_idx_scaled = df_model_idx
+df_model_idx_scaled$ext_score_scale = scale(df_model_idx$`Total Score`)
+df_model_idx_scaled$int_score_scale = scale(df_model_idx$total_score)
+```
+
+```{r}
+pop_change = read.csv("pop_change.csv")
+#View(pop_change)
+cities_list = cities_clean$geo_label_city
+
+find_all_matching_cities <- function(metro_description, cities) {
+  matched_cities <- cities[str_detect(metro_description, cities)]
+  if (length(matched_cities) == 0) {
+    return(NA)  # Return NA if no match is found
+  }
+  return(matched_cities)
+}
+pop_change$Metro.Area[str_detect(pop_change$Metro.Area, "New York")] = "New York City"
+# Applying the function to each metro_area and creating a list column
+pop_change$matched_cities <- map(pop_change$Metro.Area, find_all_matching_cities, cities = cities_list)
+
+# Expanding the data frame so that each city gets its own row
+data_expanded <- pop_change %>%
+  unnest(matched_cities) %>%
+  rename(major_city = matched_cities)
+
+# Replace NA with a placeholder if you want
+data_expanded$major_city[is.na(data_expanded$major_city)] <- "No Major City Matched"
+data_expanded$major_city[str_detect(data_expanded$Metro.Area, "New York")] = "New York City"
+## A number were false matches: Drop these
+drop_indices = c(67, 83, 89, 118, 141, 145, 169)
+data_expanded = data_expanded[-drop_indices, ]
+data_pop = data_expanded %>% filter(major_city != "No Major City Matched") %>%  select(!Metro.Area)
+
+data_pop
+```
+```{r}
+data_pop =  data_pop %>%
+  mutate(across(c(X2023, X2022, X2021, X2020), ~as.numeric(gsub(",", "", .))))
+data_joined = data_pop %>% left_join(
+  df_model_idx, by = join_by("major_city" == "geo_label_city")
+)
+data_joined %>% select(major_city, X2023, bigcity_score)
+data_pop =  data_pop %>%
+  mutate(across(c(X2023, X2022, X2021, X2020), ~as.numeric(gsub(",", "", .))))
+correlate(data_joined$X2023, data_joined$bigcity_score)
+```
+```{r}
+View(data_joined %>% select(major_city, X2023, bigcity_score))
+```
+
+
+
+## Response Variable: City ranking
+
+This section of our model will be attempting to predict the happiness of a city, from this source https://wallethub.com/edu/happiest-places-to-live/32619, using the data from our dataframe
+
+```{r}
+# Assuming the data is tab-separated
+happy <- read_csv("data/happiest_places_to_live.csv")
+happy <- happy %>% filter(!is.na(City))
+head(happy)
+## Edit names to make them equal
+happy <- happy %>%
+  mutate(City = ifelse(City == "Detroit, MI", "Detroit", City)) %>% 
+  mutate(City = ifelse(City == "Washington, DC", "Washington", City)) %>% 
+  mutate(City = ifelse(City == "New York", "New York City", City))
+```
+
+```{r}
+## Join 
+joined = cities_clean %>% left_join(happy, by = join_by(geo_label_city == City))
+response_cols = joined %>% select(any_of(colnames(happy)))
+colnames(response_cols)
+```

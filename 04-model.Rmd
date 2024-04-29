@@ -4,7 +4,7 @@ author: "Max"
 date: "2024-03-06"
 output: html_document
 ---
-
+# Model Building
 ```{r}
 clusters = cluster_labels
 clusters$cities = rownames(clusters)
@@ -29,70 +29,13 @@ final = cities_w_clusters %>% left_join(happy, by = join_by(geo_label_city == Ci
 response_cols = final %>% select(any_of(colnames(happy)))
 colnames(response_cols)
 ```
-## Compare rankings to clusters
 
-```{r}
-rankings = final %>% select(ends_with("Rank"), ends_with("Score"), geo_label_city, Cluster)
-```
-
-
-```{r}
-df_averages <- rankings %>%
-  group_by(Cluster) %>%
-  summarise(
-    avg_Rank = mean(`Overall Rank`, na.rm = TRUE),
-    avg_wellbeing = mean(`Emotional and Physical Well-being Rank`, na.rm = TRUE),
-    avg_finance = mean(`Income and Employment Rank`, na.rm = TRUE),
-    avg_env= mean(`Community and Environment Rank`, na.rm = TRUE),
-    avg_Score = mean(`Total Score`, na.rm = TRUE)
-  )
-
-# View the results
-print(df_averages)
-#correlate(df_averages %>% select(!Cluster))
-```
-```{r}
-df_long <- rankings %>%
-  pivot_longer(cols = ends_with("Rank"), names_to = "ranking", values_to = "value")
-```
-
-```{r}
-ggplot(df_long, aes(x = Cluster, y = value, fill = ranking)) +
-  geom_boxplot() +
-  theme_bw() +
-  labs(title = "Ranking Distribution by Cluster", x = "Cluster", y = "Ranking")
-```
-
-```{r}
-ggplot(df_long, aes(x = Cluster, y = value, fill = ranking)) +
-  geom_violin() +
-  theme_bw() +
-  labs(title = "Ranking Distribution by Cluster", x = "Cluster", y = "Ranking")
-```
-
-```{r}
-df_summary <- df_long %>%
-  group_by(Cluster, ranking) %>%
-  summarize(mean_value = mean(value, na.rm = TRUE))
-
-ggplot(df_summary, aes(x = Cluster, y = mean_value, fill = ranking)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  theme_bw() +
-  labs(title = "Average Ranking by Cluster", x = "Cluster", y = "Average Ranking")
-```
-
-```{r}
-ggplot(df_long, aes(x = Cluster, y = value, color = ranking)) +
-  geom_point(position = position_jitterdodge()) +
-  theme_bw() +
-  labs(title = "Rankings by Cluster", x = "Cluster", y = "Ranking")
-```
 https://www.census.gov/data/tables/time-series/demo/popest/2020s-total-metro-and-micro-statistical-areas.html
 
 ## View Total Rank
 ```{r}
-View(pca_scores)
-View(abs(pca_result$rotation))
+#View(pca_scores)
+#View(abs(pca_result$rotation))
 ```
 
 
@@ -108,7 +51,18 @@ correlate(pca_wrank %>% select(starts_with("PC"), ends_with('Rank')))
 #View(final)
 ```
 
+
+
+## Final Model:
+Train model on indexes created
+```{r}
+
+df_final = df_model_idx %>% select(`Overall Rank` ,ends_with("index"))
+x = model.matrix(`Overall Rank` ~., data = df_final)[, -1]
+y = df_final$`Overall Rank`
+```
 ```{r, echo = TRUE}
+library(glmnet)
 #First, set a grid of lambda to search over. We want to include lambda = 0 for standard linear regression
 grid.lambda <- 10^seq(10, -2, length = 100)
 
@@ -119,29 +73,6 @@ ridge.model <- glmnet(x, y, alpha = 0, lambda = grid.lambda)
 plot(ridge.model)
 ```
 
-Associated with each value of $\lambda$, we have coefficient estimates that can be viewed using the *coef()* function. As there are 100 values of $\lambda$ and 20 coefficients, the coefficents are given in a $20 \times 100$ table. We look at an example of the coefficients and then calculate their $\ell_2$ norm. We then do this across all lambda and plot the $\ell_2$ norm at each value.
-
-```{r, echo = TRUE}
-# With each value of $\lambda$ --> we have coefficient estimates in coef()
-# Look at coef, plot l2 norm,  across all lambda and plot l2 norm at each value.
-#Look at the 50th value of lambda
-ridge.model$lambda[50]
-
-#Coefficients for this value 
-coef(ridge.model)[, 50]
-
-#Norm of these variables
-sqrt(sum(coef(ridge.model)[-1, 50]^2))
-
-#Let's repeat this for all lambda values and plot the results
-ell2.norm <- numeric()
-for(i in 1:length(grid.lambda)){
-  ell2.norm[i] <- sqrt(sum(coef(ridge.model)[-1, i]^2))
-}
-
-plot(x = grid.lambda, y = ell2.norm, xlab = expression(lambda), ylab = "L2 Norm", xlim = c(10,10000))
-```
-
 **Cross-Validation and Choosing the *best* tuning parameter**
 
 Using cross validation, we will now choose an optimal tuning parameter, using *cv.glmnet()*. default k = 10, can adjust with *nfolds*.
@@ -150,16 +81,14 @@ Using cross validation, we will now choose an optimal tuning parameter, using *c
 set.seed(1) #for reproducability
 #Randomly select a training and test set.
 #Here, we leave half of the data out for later model assessment
-train <- sample(1:nrow(x), nrow(x) / 2)
+train <- sample(1:nrow(x), nrow(x) - 5)
 test <- (-train)
 y.train <- y[train]
 y.test <- y[test]
-
+x_train = x[train, ]
+x_test = x[test,]
 #Now, fit a Ridge regression model to the training data
-ridge.model.train <- glmnet(x[train, ], y.train, alpha = 0, lambda = grid.lambda)
-
-#Let's perform cross validation to choose the best model
-?cv.glmnet
+ridge.model.train <- glmnet(x_train, y.train, alpha = 0, lambda = grid.lambda)
 
 #Perform cross validation on the training set to select the best lambda
 set.seed(1) #for reproducability
@@ -173,28 +102,80 @@ plot(cv.out)
 abline(v = log(best.lambda), col = "blue", lwd = 2)
 
 #Calculate the MSPE of the model on the test set
-ridge.pred <- predict(ridge.model.train, s = best.lambda, newx = x[test, ])
+ridge.pred <- predict(ridge.model.train, s = best.lambda, newx = x_test)
 mspe.ridge <- mean((ridge.pred - y.test)^2)
 mspe.ridge
 
 #Fit the final model to the entire data set using the chosen lambda
 final.model <- glmnet(x, y, alpha = 0, lambda = best.lambda)
-Coef.Ridge <- coef(final.model)[1:20, ]
+Coef.Ridge <- coef(final.model)
 Coef.Ridge
 ```
 
 ```{r}
+lasso.model.train <- glmnet(x_train, y.train, alpha = 1, lambda = grid.lambda)
 
-set.seed(1)
-train <- sample(36, 6)
+#Perform cross validation on the training set to select the best lambda
+set.seed(1) #for reproducability
+cv.out_lasso <- cv.glmnet(x_train, y.train, alpha = 1)
+plot(cv.out_lasso)
 
+#Find the best lambda value
+best.lambda_lasso <- cv.out_lasso$lambda.min
+best.lambda_lasso
+plot(cv.out_lasso)
+abline(v = log(best.lambda_lasso), col = "blue", lwd = 2)
+
+#Calculate the MSPE of the model on the test set
+lasso.pred <- predict(lasso.model.train, s = best.lambda_lasso, newx = x_test)
+mspe.lasso <- mean((lasso.pred - y.test)^2)
+mspe.ridge
+
+#Fit the final model to the entire data set using the chosen lambda
+final.model_lasso <- glmnet(x, y, alpha = 1, lambda = best.lambda_lasso)
+Coef.lasso <- coef(final.model_lasso)
+Coef.lasso
+```
+
+
+```{r}
+library(tree, quietly = TRUE)
 #Fit a tree on the training data
-tree.boston <- tree(medv ~ ., data = Boston, subset = train) # build
-summary(tree.boston)
+tree.model <- tree(y.train ~ x[train, ]) # build
+summary(tree.model)
 
 #Visualize the tree
-plot(tree.boston)
-text(tree.boston, pretty = 0)
+plot(tree.model)
+text(tree.model, pretty = 0)
+```
+
+```{r, echo = TRUE}
+cv.treem <- cv.tree(tree.model)
+#Plot the cross-validation error against the size of the pruned tree
+plot(cv.treem$size, cv.treem$dev, type = "b")
+prune.boston <- prune.tree(tree.model, best = 2) # prune to best size
+plot(prune.boston)
+text(prune.boston, pretty = 0)
+```
+
+Now we assess the performance of the tree on the left-out test set.
+
+```{r, echo = TRUE}
+## test performance
+boston.test = x[test,]
+boston.pred <- predict(prune.boston, newdata = df_final[test,2:7])
+boston.pred
+#Plot the predicted against the truth
+plot(boston.pred, boston.test)
+abline(0, 1)
+
+#Calculate the MSPE on the test set
+mean((boston.pred - boston.test)^2)
+```
+
+
+```{r}
+
 ```
 
 
@@ -241,6 +222,9 @@ data_pop$three_yr_change = (data_pop$X2023 - data_pop$X2020) / data_pop$X2020
 data_pop$avg_change = (((data_pop$X2023 - data_pop$X2022) / data_pop$X2022) + ((data_pop$X2022 - data_pop$X2021) / data_pop$X2021) + ((data_pop$X2021 - data_pop$X2020) / data_pop$X2020)) / 3
 ```
 
+```{r}
+
+```
 
 
 ```{r, echo = TRUE}
@@ -319,8 +303,4 @@ Coef.Ridge
 ```
 
 
-```{r}
-## Mutate: pull first -,
-## 
-```
 

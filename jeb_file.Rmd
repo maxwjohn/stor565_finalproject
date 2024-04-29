@@ -1,0 +1,147 @@
+---
+title: "Untitled"
+author: "Max"
+date: "2024-04-24"
+output: html_document
+---
+
+## Option 1: Predict rank from Total Score from (https://wallethub.com/edu/happiest-places-to-live/32619)
+
+Columns:
+- Index values: Aggregation of various variables for a given cities: e.g health poverty index, high values tend to be areas with high poverty. Income equality/Education index, high values = high education/high income, low values = low education/low income....
+- From website: `Overall Rank`, `State`, `Total Score`, `Emotional and Physical Well-being Rank`, `Income and Employment Rank`, `Community and Environment Rank`
+Rows: Each City
+-  `total_score`: our personal ranking for a city (very highly correlated with Overall rank). 
+- `bigcity_score`: our personal ranking for how "big" or "suburban" a city is.
+
+You can predict on any of the Rank variables: I would recommend doing `Emotional and Physical Well-being Rank` or `Community and Environment Rank`, really any of them work though.
+
+### Use the variables that end as `_index` as predictors.
+
+
+
+```{r}
+read.csv(df_model_final, "model_final.csv")
+df_model_final
+```
+## My attmempt at modeling: incomplete, change predictor 
+Get lasso and ridge to work
+
+## Final Model:
+Train model on indexes created
+```{r}
+df_final = df_model_final %>% select(`Overall Rank` ,ends_with("index"))
+x = model.matrix(`Overall Rank` ~., data = df_final)[, -1]
+y = df_final$`Overall Rank`
+```
+```{r, echo = TRUE}
+library(glmnet)
+#First, set a grid of lambda to search over. We want to include lambda = 0 for standard linear regression
+grid.lambda <- 10^seq(10, -2, length = 100)
+
+#Fit the model across the grid of lambda values
+ridge.model <- glmnet(x, y, alpha = 0, lambda = grid.lambda)
+
+#Plot the L1 norm of the coefficents
+plot(ridge.model)
+```
+
+**Cross-Validation and Choosing the *best* tuning parameter**
+
+Using cross validation, we will now choose an optimal tuning parameter, using *cv.glmnet()*. default k = 10, can adjust with *nfolds*.
+
+```{r, echo = TRUE}
+set.seed(1) #for reproducability
+#Randomly select a training and test set.
+#Here, we leave half of the data out for later model assessment
+train <- sample(1:nrow(x), nrow(x) - 5)
+test <- (-train)
+y.train <- y[train]
+y.test <- y[test]
+x_train = x[train, ]
+x_test = x[test,]
+#Now, fit a Ridge regression model to the training data
+ridge.model.train <- glmnet(x_train, y.train, alpha = 0, lambda = grid.lambda)
+
+#Perform cross validation on the training set to select the best lambda
+set.seed(1) #for reproducability
+cv.out <- cv.glmnet(x[train, ], y.train, alpha = 0)
+plot(cv.out)
+
+#Find the best lambda value
+best.lambda <- cv.out$lambda.min
+best.lambda
+plot(cv.out)
+abline(v = log(best.lambda), col = "blue", lwd = 2)
+
+#Calculate the MSPE of the model on the test set
+ridge.pred <- predict(ridge.model.train, s = best.lambda, newx = x_test)
+mspe.ridge <- mean((ridge.pred - y.test)^2)
+mspe.ridge
+
+#Fit the final model to the entire data set using the chosen lambda
+final.model <- glmnet(x, y, alpha = 0, lambda = best.lambda)
+Coef.Ridge <- coef(final.model)
+Coef.Ridge
+```
+
+```{r}
+lasso.model.train <- glmnet(x_train, y.train, alpha = 1, lambda = grid.lambda)
+
+#Perform cross validation on the training set to select the best lambda
+set.seed(1) #for reproducability
+cv.out_lasso <- cv.glmnet(x_train, y.train, alpha = 1)
+plot(cv.out_lasso)
+
+#Find the best lambda value
+best.lambda_lasso <- cv.out_lasso$lambda.min
+best.lambda_lasso
+plot(cv.out_lasso)
+abline(v = log(best.lambda_lasso), col = "blue", lwd = 2)
+
+#Calculate the MSPE of the model on the test set
+lasso.pred <- predict(lasso.model.train, s = best.lambda_lasso, newx = x_test)
+mspe.lasso <- mean((lasso.pred - y.test)^2)
+mspe.ridge
+
+#Fit the final model to the entire data set using the chosen lambda
+final.model_lasso <- glmnet(x, y, alpha = 1, lambda = best.lambda_lasso)
+Coef.lasso <- coef(final.model_lasso)
+Coef.lasso
+```
+
+
+```{r}
+library(tree, quietly = TRUE)
+#Fit a tree on the training data
+tree.model <- tree(y.train ~ x[train, ]) # build
+summary(tree.model)
+
+#Visualize the tree
+plot(tree.model)
+text(tree.model, pretty = 0)
+```
+
+```{r, echo = TRUE}
+cv.treem <- cv.tree(tree.model)
+#Plot the cross-validation error against the size of the pruned tree
+plot(cv.treem$size, cv.treem$dev, type = "b")
+prune.boston <- prune.tree(tree.model, best = 2) # prune to best size
+plot(prune.boston)
+text(prune.boston, pretty = 0)
+```
+
+Now we assess the performance of the tree on the left-out test set.
+
+```{r, echo = TRUE}
+## test performance
+boston.test = x[test,]
+boston.pred <- predict(prune.boston, newdata = df_final[test,2:7])
+boston.pred
+#Plot the predicted against the truth
+plot(boston.pred, boston.test)
+abline(0, 1)
+
+#Calculate the MSPE on the test set
+mean((boston.pred - boston.test)^2)
+```
