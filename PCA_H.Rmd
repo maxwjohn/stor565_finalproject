@@ -11,8 +11,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## R Markdown
 
-#Using Max's/Jebb's code for cleaning data
-
 ```{r}
 library(readr)
 library(dplyr)
@@ -268,6 +266,23 @@ fviz_cluster(list(data = pca_scores, cluster = cluster_assignments),
 
 ```
 
+```{r}
+# Exclude "U.S. Total" from city names
+city_names <- cities_clean$geo_label_city[-1]
+
+# Create a data frame with city names and cluster assignments
+city_cluster_df <- data.frame(
+  City = city_names,
+  Cluster = cluster_assignments
+)
+
+# Write the data frame to a CSV file
+write.csv(city_cluster_df, file = "city_cluster_data.csv", row.names = FALSE)
+
+```
+
+
+
 ## Cluster profiling
 
 ```{r}
@@ -352,50 +367,11 @@ correlation_matrix <- cor(transposed_data, pca_result$x[, 1:12])
 # Interpret correlations
 # interpreting the first principal component, it will examine its correlations with the original variables.
 correlations_pc1 <- correlation_matrix[, 1]  # Correlations with the first principal component
-# print(correlations_pc1)
+
+print(correlations_pc1)
 # Interpret other principal components in a similar manner
 
 ```
 
 
 
-
-
-############## DO NOT USE #####################
-
-
-TO DO:
-
-PCA HC
-  - Elbow method
-  - High Dimentionality
-  
-1) Do initial Hierarchical Cluster(done)
-2) Initial Kmeans Clustering(Jeb)
-3) Do PCA → HC:(Nicolai)
-    - PCA plot (kinda like Elbow)
-4) Drop highly correlated variables: 10-20 variables (Max) --> HC
-5) Compare clusters→get final clusters
-6) Use this to predict on something
-
-Use only the first 12 principals components
-
-
-Sankey plot:
-
-
-
-get the mean of each principal components
-adult obesity
-teen births
-
-
-reduced dataset Max
-newdf.csv
-
-Use euclidian 
-
-Ridge, Lasso, Elastic net?
-Feature importance?
-
-"ward performed best based on adjusted rand index"
